@@ -112,6 +112,15 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Opção de usar dados simulados
+    use_mock_data = st.checkbox(
+        "📊 Usar dados simulados (sem API)",
+        value=True,
+        help="Marque para testar sem chave de API"
+    )
+    
+    st.markdown("---")
+    
     # Botão principal
     analyze_button = st.button(
         "🔮 GERAR PROGNÓSTICO",
@@ -121,15 +130,34 @@ with st.sidebar:
 
 # Área principal
 if analyze_button:
-    with st.spinner("🔄 Coletando dados e calculando..."):
+    with st.spinner("🔄 Calculando prognóstico..."):
         
-        # 1. Coletar dados
-        home_stats = st.session_state.collector.get_team_stats(home_team)
-        away_stats = st.session_state.collector.get_team_stats(away_team)
-        
-        if not home_stats or not away_stats:
-            st.error("❌ Erro ao coletar dados. Verifique as chaves de API.")
-            st.stop()
+        # 1. Coletar ou simular dados
+        if use_mock_data:
+            # Dados simulados para teste
+            home_stats = {
+                'team_name': teams[home_team],
+                'goals_for_home': 1.8,
+                'goals_against_home': 1.0,
+                'wins_home': 8,
+                'matches_played': 15,
+            }
+            
+            away_stats = {
+                'team_name': teams[away_team],
+                'goals_for_away': 1.5,
+                'goals_against_away': 1.2,
+                'wins_away': 5,
+                'matches_played': 15,
+            }
+        else:
+            # Coletar dados reais da API
+            home_stats = st.session_state.collector.get_team_stats(home_team)
+            away_stats = st.session_state.collector.get_team_stats(away_team)
+            
+            if not home_stats or not away_stats:
+                st.error("❌ Erro ao coletar dados. Verifique as chaves de API no arquivo .env")
+                st.stop()
         
         # 2. Preparar contexto
         context = {
