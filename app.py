@@ -128,6 +128,22 @@ with st.sidebar:
         use_container_width=True
     )
 
+# Função auxiliar para formatar nomes de mercados
+def format_market_name(market_name):
+    """Formata nome do mercado para exibição"""
+    replacements = {
+        'home_win': 'VITÓRIA CASA',
+        'away_win': 'VITÓRIA FORA',
+        'btts': 'AMBOS MARCAM',
+        'over_25': 'OVER 2.5',
+        'over_35': 'OVER 3.5',
+        'over_15': 'OVER 1.5',
+        'over_45': 'OVER 4.5',
+        'over_cards_45': 'CARTÕES OVER 4.5',
+        'over_corners_75': 'ESCANTEIOS OVER 7.5',
+    }
+    return replacements.get(market_name, market_name.replace('_', ' ').upper())
+
 # Área principal
 if analyze_button:
     with st.spinner("🔄 Calculando prognóstico..."):
@@ -384,7 +400,7 @@ if analyze_button:
                 with st.container():
                     st.markdown(f"""
                     <div class="value-bet">
-                        <h4>#{i} {vb['market'].replace('_', ' ').upper()}</h4>
+                        <h4>#{i} {format_market_name(vb['market'])}</h4>
                         <p><strong>Odd:</strong> {vb['odd']:.2f} | 
                            <strong>Edge:</strong> +{vb['edge']*100:.1f}% | 
                            <strong>Confiança:</strong> {vb['confidence']}</p>
