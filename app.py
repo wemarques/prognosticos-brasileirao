@@ -451,4 +451,4 @@ st.markdown("""
     <p>⚽ Prognósticos Brasileirão v1.0 | Dados via API-Football</p>
     <p>⚠️ Aposte com responsabilidade | Este sistema é educacional</p>
 </div>
-""", unsafe_allow_html=True""")
+""", unsafe_allow_html=True)
