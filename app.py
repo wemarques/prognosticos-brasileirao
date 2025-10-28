@@ -12,10 +12,19 @@ import pandas as pd
 from datetime import datetime
 
 # Importar nossos módulos
-from data.collector import FootballDataCollector
-from analysis.calculator import PrognosisCalculator
-from analysis.value_detector import ValueBetDetector
-from utils.api_validator import APIValidator
+try:
+    from data.collector import FootballDataCollector
+    from analysis.calculator import PrognosisCalculator
+    from analysis.value_detector import ValueBetDetector
+    from utils.api_validator import APIValidator
+except ModuleNotFoundError as e:
+    st.error(f"❌ Erro ao importar módulos: {e}")
+    st.info("💡 Tentando fallback...")
+    # Fallback já foi aplicado no início, tentar novamente
+    from data.collector import FootballDataCollector
+    from analysis.calculator import PrognosisCalculator
+    from analysis.value_detector import ValueBetDetector
+    from utils.api_validator import APIValidator
 
 # Configuração da página
 st.set_page_config(

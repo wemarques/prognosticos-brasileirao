@@ -1,6 +1,18 @@
-from models.dixon_coles import DixonColesModel
-from models.monte_carlo import MonteCarloSimulator
-from analysis.calibration import BrasileiraoCalibrator
+import sys
+import os
+
+# Garantir que conseguimos importar os módulos
+try:
+    from models.dixon_coles import DixonColesModel
+    from models.monte_carlo import MonteCarloSimulator
+    from analysis.calibration import BrasileiraoCalibrator
+except ModuleNotFoundError:
+    # Fallback: adicionar diretório pai ao path
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from models.dixon_coles import DixonColesModel
+    from models.monte_carlo import MonteCarloSimulator
+    from analysis.calibration import BrasileiraoCalibrator
+
 from typing import Dict
 
 class PrognosisCalculator:
