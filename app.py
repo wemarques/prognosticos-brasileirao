@@ -270,10 +270,7 @@ def main():
             }
             
             df = pd.DataFrame(scores_data)
-            st.dataframe(
-                df.style.background_gradient(subset=['Probabilidade'], cmap='RdYlGn'),
-                use_container_width=True
-            )
+            st.dataframe(df, use_container_width=True)
     
     # Informações adicionais
     with st.expander("ℹ️ Sobre o Sistema"):
