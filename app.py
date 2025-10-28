@@ -65,29 +65,51 @@ try:
 except Exception:
     pass
 
-# Mapeamento de times
-BRASILEIRAO_TEAMS = {
-    'Flamengo': 127,
-    'Palmeiras': 128,
-    'São Paulo': 126,
-    'Corinthians': 131,
-    'Santos': 124,
-    'Grêmio': 136,
-    'Internacional': 134,
-    'Atlético-MG': 133,
-    'Fluminense': 125,
-    'Botafogo': 129,
-    'Athletico-PR': 149,
-    'Cruzeiro': 132,
-    'Vasco': 130,
-    'Bahia': 159,
-    'Fortaleza': 160,
-    'Bragantino': 1371,
-    'Cuiabá': 1193,
-    'Criciúma': 1207,
-    'Vitória': 154,
-    'Juventude': 1188,
-}
+# Mapeamento de times (será carregado dinamicamente)
+BRASILEIRAO_TEAMS = {}
+
+# Carregar times da API
+try:
+    from data.collector import FootballDataCollector
+    collector_temp = FootballDataCollector()
+    teams_from_api = collector_temp.get_teams()
+    
+    if teams_from_api:
+        for team in teams_from_api:
+            BRASILEIRAO_TEAMS[team['name']] = team['id']
+    else:
+        # Fallback: lista de nomes apenas
+        BRASILEIRAO_TEAMS = {
+            'Flamengo': 0,
+            'Palmeiras': 0,
+            'São Paulo': 0,
+            'Corinthians': 0,
+            'Santos': 0,
+            'Grêmio': 0,
+            'Internacional': 0,
+            'Atlético Mineiro': 0,
+            'Fluminense': 0,
+            'Botafogo': 0,
+            'Athletico Paranaense': 0,
+            'Cruzeiro': 0,
+            'Vasco da Gama': 0,
+            'Bahia': 0,
+            'Fortaleza': 0,
+            'Red Bull Bragantino': 0,
+            'Cuiabá': 0,
+            'Criciúma': 0,
+            'Vitória': 0,
+            'Juventude': 0,
+        }
+except Exception as e:
+    # Fallback completo
+    BRASILEIRAO_TEAMS = {
+        'Flamengo': 0,
+        'Palmeiras': 0,
+        'São Paulo': 0,
+        'Corinthians': 0,
+        'Santos': 0,
+    }
 
 # CSS Customizado
 st.markdown("""
@@ -164,9 +186,9 @@ def generate_prognosis_real(home_team, away_team, context):
     if not home_id or not away_id:
         raise ValueError("Time não encontrado no mapeamento")
     
-    # Buscar estatísticas
-    home_api_stats = collector.get_team_stats(home_id)
-    away_api_stats = collector.get_team_stats(away_id)
+    # Buscar estatísticas (calcular a partir de partidas recentes)
+    home_api_stats = collector.calculate_team_stats(home_id, venue="HOME")
+    away_api_stats = collector.calculate_team_stats(away_id, venue="AWAY")
     
     # Buscar H2H
     h2h_matches = collector.get_h2h(home_id, away_id, last=5)
