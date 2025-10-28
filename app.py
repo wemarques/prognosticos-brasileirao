@@ -1,3 +1,10 @@
+import sys
+import os
+
+# Garantir que o diretório raiz está no Python path
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
