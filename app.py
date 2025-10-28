@@ -1,15 +1,24 @@
+import streamlit as st
+
+# Configuração da página - DEVE SER A PRIMEIRA CHAMADA STREAMLIT!
+st.set_page_config(
+    page_title="Prognósticos Brasileirão",
+    page_icon="⚽",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Agora sim, importar outros módulos
 import sys
 import os
-
-# Garantir que o diretório raiz está no Python path
-if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from datetime import datetime
+
+# Garantir que o diretório raiz está no Python path
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Importar nossos módulos
 try:
@@ -25,14 +34,6 @@ except ModuleNotFoundError as e:
     from analysis.calculator import PrognosisCalculator
     from analysis.value_detector import ValueBetDetector
     from utils.api_validator import APIValidator
-
-# Configuração da página
-st.set_page_config(
-    page_title="Prognósticos Brasileirão",
-    page_icon="⚽",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # CSS customizado para deixar bonito
 st.markdown("""
