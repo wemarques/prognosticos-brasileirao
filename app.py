@@ -65,6 +65,12 @@ try:
 except Exception:
     pass
 
+try:
+    from utils.recommendation import generate_official_recommendation, get_confidence_color
+    MODULES_AVAILABLE['recommendation'] = True
+except Exception:
+    pass
+
 # Mapeamento de times - carregado dinamicamente da API
 BRASILEIRAO_TEAMS = {}
 
@@ -257,6 +263,74 @@ def display_results(prognosis, value_bets, home_team, away_team, h2h_stats=None)
     """Exibe resultados completos"""
     
     st.success(f"✅ Análise: **{home_team}** vs **{away_team}**")
+    
+    # RECOMENDAÇÃO OFICIAL (DESTAQUE NO TOPO)
+    st.markdown("---")
+    st.markdown("## 🎯 RECOMENDAÇÃO OFICIAL DO SISTEMA")
+    
+    try:
+        recommendation = generate_official_recommendation(
+            prognosis, value_bets, home_team, away_team
+        )
+        
+        main_rec = recommendation['main']
+        confidence_color = get_confidence_color(main_rec['confidence'])
+        
+        # Card principal da recomendação
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, {confidence_color}22 0%, {confidence_color}11 100%);
+            border-left: 5px solid {confidence_color};
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+        ">
+            <h3 style="margin: 0 0 1rem 0; color: {confidence_color};">
+                🎯 {main_rec['recommendation']}
+            </h3>
+            <p style="font-size: 1.1rem; margin: 0.5rem 0;">
+                <strong>Mercado:</strong> {main_rec['market']}
+            </p>
+            <p style="font-size: 1.1rem; margin: 0.5rem 0;">
+                <strong>Confiança:</strong> <span style="color: {confidence_color}; font-weight: bold;">{main_rec['confidence']}</span> ({main_rec['confidence_score']:.1f}%)
+            </p>
+            <p style="font-size: 1.1rem; margin: 0.5rem 0;">
+                <strong>Stake Recomendado:</strong> {main_rec['stake']}
+            </p>
+            <p style="font-size: 1.1rem; margin: 0.5rem 0;">
+                <strong>ROI Esperado:</strong> {main_rec['expected_roi']}
+            </p>
+            <p style="margin: 1rem 0 0 0; padding-top: 1rem; border-top: 1px solid {confidence_color}44;">
+                <strong>💡 Justificativa:</strong><br/>
+                {main_rec['reason']}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Alternativas
+        if recommendation['alternatives']:
+            with st.expander("🔄 Ver Recomendações Alternativas"):
+                for i, alt in enumerate(recommendation['alternatives'], 1):
+                    alt_color = get_confidence_color(alt['confidence'])
+                    st.markdown(f"""
+                    <div style="
+                        background: #f8f9fa;
+                        border-left: 3px solid {alt_color};
+                        padding: 1rem;
+                        margin: 0.5rem 0;
+                        border-radius: 0.3rem;
+                    ">
+                        <h4 style="margin: 0 0 0.5rem 0;">{i}. {alt['recommendation']}</h4>
+                        <p style="margin: 0.3rem 0;"><strong>Confiança:</strong> {alt['confidence']} ({alt['confidence_score']:.1f}%)</p>
+                        <p style="margin: 0.3rem 0;"><strong>Stake:</strong> {alt['stake']}</p>
+                        <p style="margin: 0.3rem 0; font-size: 0.9rem;">{alt['reason']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+    
+    except Exception as e:
+        st.warning(f"⚠️ Não foi possível gerar recomendação: {e}")
+    
+    st.markdown("---")
     
     # Métricas principais
     st.subheader("📊 Resultado Final (1X2)")
@@ -476,6 +550,19 @@ def main():
         
         if not all(MODULES_AVAILABLE.values()):
             st.warning("⚠️ Módulos faltando - apenas modo simulado disponível")
+        
+        st.markdown("---")
+        st.header("🏆 Rodada")
+        
+        rodada = st.number_input(
+            "Selecione a rodada",
+            min_value=1,
+            max_value=38,
+            value=1,
+            help="Rodada do Brasileirão (1-38)"
+        )
+        
+        st.info(f"📅 Analisando rodada **{rodada}** do Brasileirão 2025")
     
     # Conteúdo principal
     if not SCIENTIFIC_IMPORTS_OK:
