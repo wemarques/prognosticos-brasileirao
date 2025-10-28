@@ -6,4 +6,3 @@ scipy==1.13.0
 plotly>=5.18.0
 python-dotenv==1.0.0
 pytz==2024.1
-
