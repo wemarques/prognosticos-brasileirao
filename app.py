@@ -65,51 +65,33 @@ try:
 except Exception:
     pass
 
-# Mapeamento de times (será carregado dinamicamente)
-BRASILEIRAO_TEAMS = {}
+# Mapeamento de times (lista fixa para garantir funcionamento)
+# IDs serão buscados dinamicamente quando necessário
+BRASILEIRAO_TEAMS = {
+    'Flamengo': 0,
+    'Palmeiras': 0,
+    'São Paulo': 0,
+    'Corinthians': 0,
+    'Santos': 0,
+    'Grêmio': 0,
+    'Internacional': 0,
+    'Atlético Mineiro': 0,
+    'Fluminense': 0,
+    'Botafogo': 0,
+    'Athletico Paranaense': 0,
+    'Cruzeiro': 0,
+    'Vasco da Gama': 0,
+    'Bahia': 0,
+    'Fortaleza': 0,
+    'Red Bull Bragantino': 0,
+    'Cuiabá': 0,
+    'Criciúma': 0,
+    'Vitória': 0,
+    'Juventude': 0,
+}
 
-# Carregar times da API
-try:
-    from data.collector import FootballDataCollector
-    collector_temp = FootballDataCollector()
-    teams_from_api = collector_temp.get_teams()
-    
-    if teams_from_api:
-        for team in teams_from_api:
-            BRASILEIRAO_TEAMS[team['name']] = team['id']
-    else:
-        # Fallback: lista de nomes apenas
-        BRASILEIRAO_TEAMS = {
-            'Flamengo': 0,
-            'Palmeiras': 0,
-            'São Paulo': 0,
-            'Corinthians': 0,
-            'Santos': 0,
-            'Grêmio': 0,
-            'Internacional': 0,
-            'Atlético Mineiro': 0,
-            'Fluminense': 0,
-            'Botafogo': 0,
-            'Athletico Paranaense': 0,
-            'Cruzeiro': 0,
-            'Vasco da Gama': 0,
-            'Bahia': 0,
-            'Fortaleza': 0,
-            'Red Bull Bragantino': 0,
-            'Cuiabá': 0,
-            'Criciúma': 0,
-            'Vitória': 0,
-            'Juventude': 0,
-        }
-except Exception as e:
-    # Fallback completo
-    BRASILEIRAO_TEAMS = {
-        'Flamengo': 0,
-        'Palmeiras': 0,
-        'São Paulo': 0,
-        'Corinthians': 0,
-        'Santos': 0,
-    }
+# Cache de IDs carregados da API
+TEAMS_CACHE = {}
 
 # CSS Customizado
 st.markdown("""
@@ -170,6 +152,26 @@ def show_system_status():
             st.warning("🧪 **Modo:** Demonstração")
 
 
+def load_team_ids_from_api():
+    """Carrega IDs dos times da API (sob demanda)"""
+    global TEAMS_CACHE
+    
+    if TEAMS_CACHE:
+        return TEAMS_CACHE
+    
+    try:
+        collector = FootballDataCollector()
+        teams = collector.get_teams()
+        
+        for team in teams:
+            TEAMS_CACHE[team['name']] = team['id']
+        
+        return TEAMS_CACHE
+    except Exception as e:
+        st.warning(f"⚠️ Não foi possível carregar IDs dos times: {e}")
+        return {}
+
+
 def generate_prognosis_real(home_team, away_team, context):
     """Gera prognóstico usando módulos reais"""
     
@@ -179,12 +181,19 @@ def generate_prognosis_real(home_team, away_team, context):
     calculator = PrognosisCalculator()
     value_detector = ValueBetDetector()
     
-    # 1. Coletar dados da API
-    home_id = BRASILEIRAO_TEAMS.get(home_team)
-    away_id = BRASILEIRAO_TEAMS.get(away_team)
+    # 1. Carregar IDs dos times da API
+    st.info("🔄 Carregando times da API...")
+    team_ids = load_team_ids_from_api()
+    
+    if not team_ids:
+        raise ValueError("❌ Não foi possível carregar times da API. Verifique a API key.")
+    
+    # 2. Buscar IDs dos times selecionados
+    home_id = team_ids.get(home_team)
+    away_id = team_ids.get(away_team)
     
     if not home_id or not away_id:
-        raise ValueError("Time não encontrado no mapeamento")
+        raise ValueError(f"❌ Time não encontrado: {home_team if not home_id else away_team}")
     
     # Buscar estatísticas (calcular a partir de partidas recentes)
     home_api_stats = collector.calculate_team_stats(home_id, venue="HOME")
