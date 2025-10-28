@@ -1,6 +1,5 @@
 build-essential
 gfortran
-pkg-config
 libopenblas-dev
 liblapack-dev
 
