@@ -3,4 +3,3 @@ gfortran
 pkg-config
 libopenblas-dev
 liblapack-dev
-
