@@ -8,6 +8,7 @@ from datetime import datetime
 from data.collector import FootballDataCollector
 from analysis.calculator import PrognosisCalculator
 from analysis.value_detector import ValueBetDetector
+from utils.api_validator import APIValidator
 
 # Configuração da página
 st.set_page_config(
@@ -48,6 +49,7 @@ if 'collector' not in st.session_state:
     st.session_state.collector = FootballDataCollector()
     st.session_state.calculator = PrognosisCalculator(brasileirao_mode=True)
     st.session_state.value_detector = ValueBetDetector()
+    st.session_state.api_validator = APIValidator()
 
 # Header
 st.markdown('<h1 class="main-header">⚽ Prognósticos Brasileirão Série A</h1>', 
@@ -118,6 +120,14 @@ with st.sidebar:
         value=True,
         help="Marque para testar sem chave de API"
     )
+    
+    st.markdown("---")
+    
+    # Botão de validação de APIs
+    if not use_mock_data:
+        if st.button("🔍 Testar Conexão com APIs", use_container_width=True):
+            with st.spinner("Testando APIs..."):
+                st.session_state.api_validator.show_validation_ui()
     
     st.markdown("---")
     
