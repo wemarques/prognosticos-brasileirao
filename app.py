@@ -563,6 +563,26 @@ def main():
         )
         
         st.info(f"📅 Analisando rodada **{rodada}** do Brasileirão 2025")
+        
+        # Estatísticas de cache
+        if use_real_data:
+            try:
+                from utils.cache import matches_cache
+                stats = matches_cache.get_stats()
+                
+                if stats['total_requests'] > 0:
+                    st.markdown("---")
+                    st.header("💾 Cache")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Hit Rate", f"{stats['hit_rate']:.0f}%")
+                    with col2:
+                        st.metric("Itens", stats['cached_items'])
+                    
+                    st.caption(f"✅ {stats['hits']} hits | ❌ {stats['misses']} misses")
+            except:
+                pass
     
     # Conteúdo principal
     if not SCIENTIFIC_IMPORTS_OK:

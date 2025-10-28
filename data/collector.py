@@ -13,6 +13,19 @@ from typing import Dict, List, Optional
 
 load_dotenv()
 
+# Importar cache
+try:
+    from utils.cache import (
+        matches_cache,
+        get_cache_key_matches,
+        get_cache_key_team_stats,
+        get_cache_key_h2h
+    )
+    CACHE_ENABLED = True
+except ImportError:
+    CACHE_ENABLED = False
+    print("⚠️ Cache não disponível")
+
 class FootballDataCollector:
     """Coleta dados da API Football-Data.org"""
     
@@ -86,7 +99,7 @@ class FootballDataCollector:
         limit: int = 10
     ) -> List[Dict]:
         """
-        Busca partidas de um time
+        Busca partidas de um time (com cache)
         
         Args:
             team_id: ID do time
@@ -96,6 +109,14 @@ class FootballDataCollector:
         Returns:
             Lista de partidas
         """
+        # Verificar cache
+        if CACHE_ENABLED:
+            cache_key = get_cache_key_matches(team_id, status, limit)
+            cached_data = matches_cache.get(cache_key)
+            if cached_data is not None:
+                return cached_data
+        
+        # Buscar da API
         endpoint = f"{self.base_url}/teams/{team_id}/matches"
         params = {
             'status': status,
@@ -107,7 +128,13 @@ class FootballDataCollector:
             response = requests.get(endpoint, headers=self.headers, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            return data.get('matches', [])
+            matches = data.get('matches', [])
+            
+            # Armazenar no cache
+            if CACHE_ENABLED and matches:
+                matches_cache.set(cache_key, matches)
+            
+            return matches
         except Exception as e:
             print(f"Erro ao buscar partidas do time {team_id}: {e}")
             return []

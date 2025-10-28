@@ -150,38 +150,46 @@ def generate_official_recommendation(
                 'priority': 5
             })
     
+    # Se não há recomendações, criar uma baseada no mercado mais provável
+    if not recommendations:
+        # Encontrar maior probabilidade entre todos os mercados
+        all_probs = [
+            ('home_win', probs.get('home_win', 0), f"Vitória {home_team}"),
+            ('draw', probs.get('draw', 0), "Empate"),
+            ('away_win', probs.get('away_win', 0), f"Vitória {away_team}"),
+            ('over_25', probs.get('over_25', 0), "Over 2.5 gols"),
+            ('btts', probs.get('btts', 0), "Ambos Marcam - SIM"),
+        ]
+        
+        best_market = max(all_probs, key=lambda x: x[1])
+        
+        recommendations.append({
+            'market': '1X2' if best_market[0] in ['home_win', 'draw', 'away_win'] else best_market[0].upper(),
+            'recommendation': best_market[2],
+            'confidence': 'MÉDIA' if best_market[1] > 0.40 else 'BAIXA',
+            'confidence_score': best_market[1] * 100,
+            'reason': f"Mercado com maior probabilidade ({best_market[1]*100:.1f}%). "
+                     f"Apesar de não haver edge significativo, esta é a opção mais provável "
+                     f"segundo os modelos estatísticos.",
+            'stake': "1% do bankroll (conservador)" if best_market[1] > 0.40 else "0.5% do bankroll (muito conservador)",
+            'expected_roi': f"{(best_market[1] - 0.33) * 100:.1f}%" if best_market[0] in ['home_win', 'draw', 'away_win'] else f"{(best_market[1] - 0.5) * 100:.1f}%",
+            'priority': 10
+        })
+    
     # Ordenar por prioridade e confiança
     recommendations.sort(key=lambda x: (x['priority'], -x['confidence_score']))
     
     # Retornar melhor recomendação
-    if recommendations:
-        best = recommendations[0]
-        
-        # Adicionar alternativas
-        alternatives = recommendations[1:3] if len(recommendations) > 1 else []
-        
-        return {
-            'main': best,
-            'alternatives': alternatives,
-            'total_recommendations': len(recommendations)
-        }
-    else:
-        # Fallback: sem recomendação forte
-        return {
-            'main': {
-                'market': 'Nenhum',
-                'recommendation': 'Aguardar melhores oportunidades',
-                'confidence': 'BAIXA',
-                'confidence_score': 0,
-                'reason': 'Nenhum mercado apresenta edge significativo neste momento. '
-                         'Recomenda-se aguardar por jogos com probabilidades mais claras.',
-                'stake': '0% do bankroll',
-                'expected_roi': '0%',
-                'priority': 99
-            },
-            'alternatives': [],
-            'total_recommendations': 0
-        }
+    best = recommendations[0]
+    
+    # Adicionar alternativas
+    alternatives = recommendations[1:3] if len(recommendations) > 1 else []
+    
+    return {
+        'main': best,
+        'alternatives': alternatives,
+        'total_recommendations': len(recommendations)
+    }
 
 
 def _format_market_name(market: str, home_team: str, away_team: str) -> str:
