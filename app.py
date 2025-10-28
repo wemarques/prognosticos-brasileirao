@@ -65,33 +65,27 @@ try:
 except Exception:
     pass
 
-# Mapeamento de times (lista fixa para garantir funcionamento)
-# IDs serão buscados dinamicamente quando necessário
-BRASILEIRAO_TEAMS = {
-    'Flamengo': 0,
-    'Palmeiras': 0,
-    'São Paulo': 0,
-    'Corinthians': 0,
-    'Santos': 0,
-    'Grêmio': 0,
-    'Internacional': 0,
-    'Atlético Mineiro': 0,
-    'Fluminense': 0,
-    'Botafogo': 0,
-    'Athletico Paranaense': 0,
-    'Cruzeiro': 0,
-    'Vasco da Gama': 0,
-    'Bahia': 0,
-    'Fortaleza': 0,
-    'Red Bull Bragantino': 0,
-    'Cuiabá': 0,
-    'Criciúma': 0,
-    'Vitória': 0,
-    'Juventude': 0,
-}
+# Mapeamento de times - carregado dinamicamente da API
+BRASILEIRAO_TEAMS = {}
 
-# Cache de IDs carregados da API
-TEAMS_CACHE = {}
+# Carregar times da API Football-Data.org
+try:
+    from data.collector import FootballDataCollector
+    _temp_collector = FootballDataCollector()
+    _teams_from_api = _temp_collector.get_teams()
+    
+    if _teams_from_api:
+        for team in _teams_from_api:
+            BRASILEIRAO_TEAMS[team['name']] = team['id']
+        st.sidebar.success(f"✅ {len(BRASILEIRAO_TEAMS)} times carregados da API")
+    else:
+        st.sidebar.warning("⚠️ Nenhum time retornado pela API")
+        # Fallback mínimo
+        BRASILEIRAO_TEAMS = {'Carregando...': 0}
+except Exception as e:
+    st.sidebar.error(f"❌ Erro ao carregar times: {str(e)[:50]}")
+    # Fallback mínimo
+    BRASILEIRAO_TEAMS = {'Erro ao carregar': 0}
 
 # CSS Customizado
 st.markdown("""
@@ -152,24 +146,7 @@ def show_system_status():
             st.warning("🧪 **Modo:** Demonstração")
 
 
-def load_team_ids_from_api():
-    """Carrega IDs dos times da API (sob demanda)"""
-    global TEAMS_CACHE
-    
-    if TEAMS_CACHE:
-        return TEAMS_CACHE
-    
-    try:
-        collector = FootballDataCollector()
-        teams = collector.get_teams()
-        
-        for team in teams:
-            TEAMS_CACHE[team['name']] = team['id']
-        
-        return TEAMS_CACHE
-    except Exception as e:
-        st.warning(f"⚠️ Não foi possível carregar IDs dos times: {e}")
-        return {}
+
 
 
 def generate_prognosis_real(home_team, away_team, context):
@@ -181,19 +158,12 @@ def generate_prognosis_real(home_team, away_team, context):
     calculator = PrognosisCalculator()
     value_detector = ValueBetDetector()
     
-    # 1. Carregar IDs dos times da API
-    st.info("🔄 Carregando times da API...")
-    team_ids = load_team_ids_from_api()
-    
-    if not team_ids:
-        raise ValueError("❌ Não foi possível carregar times da API. Verifique a API key.")
-    
-    # 2. Buscar IDs dos times selecionados
-    home_id = team_ids.get(home_team)
-    away_id = team_ids.get(away_team)
+    # 1. Buscar IDs dos times (já carregados na inicialização)
+    home_id = BRASILEIRAO_TEAMS.get(home_team)
+    away_id = BRASILEIRAO_TEAMS.get(away_team)
     
     if not home_id or not away_id:
-        raise ValueError(f"❌ Time não encontrado: {home_team if not home_id else away_team}")
+        raise ValueError(f"❌ Time não encontrado no mapeamento da API")
     
     # Buscar estatísticas (calcular a partir de partidas recentes)
     home_api_stats = collector.calculate_team_stats(home_id, venue="HOME")
