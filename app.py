@@ -176,7 +176,7 @@ def generate_prognosis_real(home_team, away_team, context):
     away_api_stats = collector.calculate_team_stats(away_id, venue="AWAY")
     
     # Buscar H2H
-    h2h_matches = collector.get_h2h(home_id, away_id, last=5)
+    h2h_matches = collector.get_h2h(home_id, away_id, limit=5)
     
     # 2. Processar dados
     home_stats = processor.process_team_stats(home_api_stats, is_home=True)
