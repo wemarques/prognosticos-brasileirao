@@ -624,7 +624,24 @@ def main():
         with col3:
             is_derby = st.checkbox("⚔️ É um derby?")
     
-    # Botão de análise
+    # Modo de análise
+    st.markdown("---")
+    analysis_mode = st.radio(
+        "🎯 Modo de Análise",
+        ["Jogo Único", "Rodada Completa"],
+        horizontal=True
+    )
+    
+    if analysis_mode == "Rodada Completa":
+        # Análise de rodada completa
+        try:
+            from ui.round_analysis import show_round_analysis
+            show_round_analysis(rodada)
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar análise de rodada: {e}")
+        return
+    
+    # Botão de análise (modo jogo único)
     if st.button("🔮 GERAR PROGNÓSTICO", type="primary", use_container_width=True):
         
         if home_team == away_team:

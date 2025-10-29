@@ -134,6 +134,67 @@ def generate_official_recommendation(
             'priority': 4
         })
     
+    # 6. Analisar Cartões
+    # Usar estatísticas de cartões se disponíveis
+    cards_prob_over_35 = prognosis.get('cards', {}).get('over_35', 0)
+    cards_prob_over_45 = prognosis.get('cards', {}).get('over_45', 0)
+    
+    if cards_prob_over_35 > 0.55:
+        recommendations.append({
+            'market': 'Cartões',
+            'recommendation': 'Over 3.5 cartões',
+            'confidence': 'MÉDIA' if cards_prob_over_35 > 0.60 else 'MÉDIA-BAIXA',
+            'confidence_score': cards_prob_over_35 * 100,
+            'reason': f"Jogo com tendência a muitas faltas. "
+                     f"Probabilidade de Over 3.5 cartões: {cards_prob_over_35*100:.1f}%.",
+            'stake': "1% do bankroll",
+            'expected_roi': f"{(cards_prob_over_35 - 0.5) * 100:.1f}%",
+            'priority': 5
+        })
+    
+    if cards_prob_over_45 > 0.60:
+        recommendations.append({
+            'market': 'Cartões',
+            'recommendation': 'Over 4.5 cartões',
+            'confidence': 'MÉDIA-ALTA',
+            'confidence_score': cards_prob_over_45 * 100,
+            'reason': f"Jogo muito disputado com muitas faltas esperadas. "
+                     f"Probabilidade de Over 4.5 cartões: {cards_prob_over_45*100:.1f}%.",
+            'stake': "1-2% do bankroll",
+            'expected_roi': f"{(cards_prob_over_45 - 0.5) * 100:.1f}%",
+            'priority': 4
+        })
+    
+    # 7. Analisar Escanteios
+    corners_prob_over_85 = prognosis.get('corners', {}).get('over_85', 0)
+    corners_prob_over_95 = prognosis.get('corners', {}).get('over_95', 0)
+    
+    if corners_prob_over_85 > 0.55:
+        recommendations.append({
+            'market': 'Escanteios',
+            'recommendation': 'Over 8.5 escanteios',
+            'confidence': 'MÉDIA' if corners_prob_over_85 > 0.60 else 'MÉDIA-BAIXA',
+            'confidence_score': corners_prob_over_85 * 100,
+            'reason': f"Times com jogo ofensivo. "
+                     f"Probabilidade de Over 8.5 escanteios: {corners_prob_over_85*100:.1f}%.",
+            'stake': "1% do bankroll",
+            'expected_roi': f"{(corners_prob_over_85 - 0.5) * 100:.1f}%",
+            'priority': 5
+        })
+    
+    if corners_prob_over_95 > 0.60:
+        recommendations.append({
+            'market': 'Escanteios',
+            'recommendation': 'Over 9.5 escanteios',
+            'confidence': 'MÉDIA-ALTA',
+            'confidence_score': corners_prob_over_95 * 100,
+            'reason': f"Jogo muito ofensivo com muitos ataques esperados. "
+                     f"Probabilidade de Over 9.5 escanteios: {corners_prob_over_95*100:.1f}%.",
+            'stake': "1-2% do bankroll",
+            'expected_roi': f"{(corners_prob_over_95 - 0.5) * 100:.1f}%",
+            'priority': 4
+        })
+    
     # 5. Placar Exato (se houver placar muito provável)
     if prognosis.get('top_scores'):
         top_score = prognosis['top_scores'][0]
