@@ -12,7 +12,58 @@ class DataProcessor:
         # Médias da liga para normalização
         self.league_avg_goals = 1.82
         self.league_avg_xg = 1.40
-    
+
+    def process_match_data(
+        self,
+        home_stats: Dict,
+        away_stats: Dict,
+        h2h_data: Dict,
+        home_team_name: str,
+        away_team_name: str
+    ) -> Dict:
+        """
+        Processa dados completos de uma partida para uso nos modelos
+        
+        Args:
+            home_stats: Estatísticas do time mandante
+            away_stats: Estatísticas do time visitante
+            h2h_data: Dados de confrontos diretos
+            home_team_name: Nome do time mandante
+            away_team_name: Nome do time visitante
+            
+        Returns:
+            Dict com xG_home, xG_away e outras métricas processadas
+        """
+        # Processar estatísticas dos times
+        home_processed = self.process_team_stats(home_stats, is_home=True)
+        away_processed = self.process_team_stats(away_stats, is_home=False)
+        
+        # Processar H2H se disponível
+        if h2h_data:
+            h2h_processed = self.process_h2h(h2h_data, home_team_name, away_team_name)
+            
+            # Mesclar com H2H
+            home_final = self.merge_stats(home_processed, h2h_processed, is_home=True)
+            away_final = self.merge_stats(away_processed, h2h_processed, is_home=False)
+        else:
+            home_final = home_processed
+            away_final = away_processed
+        
+        # Extrair xG para retorno
+        xg_home = home_final.get('xg_for_home', self.league_avg_goals * 1.15)
+        xg_away = away_final.get('xg_for_away', self.league_avg_goals * 0.85)
+        
+        return {
+            'xG_home': xg_home,
+            'xG_away': xg_away,
+            'home_stats': home_final,
+            'away_stats': away_final,
+            'attack_strength_home': home_final.get('attack_strength', 1.0),
+            'defense_strength_home': home_final.get('defense_strength', 1.0),
+            'attack_strength_away': away_final.get('attack_strength', 1.0),
+            'defense_strength_away': away_final.get('defense_strength', 1.0),
+        }
+
     def process_team_stats(self, api_stats: Dict, is_home: bool = True) -> Dict:
         """
         Processa estatísticas de um time da API
@@ -293,4 +344,3 @@ class DataProcessor:
                 'goals_per_game': self.league_avg_goals,
                 'goals_conceded_per_game': self.league_avg_goals,
             }
-
