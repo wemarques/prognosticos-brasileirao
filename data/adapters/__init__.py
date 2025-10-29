@@ -1,0 +1,1 @@
+"""Adaptadores de dados para diferentes APIs"""

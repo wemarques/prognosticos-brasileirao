@@ -1,0 +1,1 @@
+"""Collectors para diferentes APIs de futebol"""
