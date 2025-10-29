@@ -1,5 +1,6 @@
 """
 Dados de árbitros e suas estatísticas de cartões
+Suporta múltiplas ligas: Brasileirão e Premier League
 """
 
 REFEREE_STATS = {
@@ -180,118 +181,254 @@ REFEREE_ID_MAP = {
     '10': 'denis_da_silva_serafim'
 }
 
-# Estatísticas gerais da liga
+# PREMIER LEAGUE REFEREES 2024/2025
+PREMIER_LEAGUE_REFEREE_STATS = {
+    'simon_hooper': {
+        'name': 'Simon Hooper',
+        'matches_total': 24,
+        'cards_per_match': 4.9,
+        'yellow_cards_avg': 4.4,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.17,  # Rigoroso
+        'accuracy': 94.92,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.9, 'leniency': 1.17},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.9, 'leniency': 1.17}
+        }
+    },
+    'anthony_taylor': {
+        'name': 'Anthony Taylor',
+        'matches_total': 31,
+        'cards_per_match': 4.5,
+        'yellow_cards_avg': 4.0,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.07,  # Rigoroso
+        'accuracy': 94.74,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.5, 'leniency': 1.07},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.5, 'leniency': 1.07}
+        }
+    },
+    'michael_oliver': {
+        'name': 'Michael Oliver',
+        'matches_total': 26,
+        'cards_per_match': 4.3,
+        'yellow_cards_avg': 3.8,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.02,  # Médio
+        'accuracy': 94.64,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.3, 'leniency': 1.02},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.3, 'leniency': 1.02}
+        }
+    },
+    'john_brooks': {
+        'name': 'John Brooks',
+        'matches_total': 16,
+        'cards_per_match': 4.4,
+        'yellow_cards_avg': 3.9,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.05,  # Rigoroso
+        'accuracy': 94.29,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.4, 'leniency': 1.05},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.4, 'leniency': 1.05}
+        }
+    },
+    'jarred_gillett': {
+        'name': 'Jarred Gillett',
+        'matches_total': 16,
+        'cards_per_match': 4.6,
+        'yellow_cards_avg': 4.1,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.10,  # Rigoroso
+        'accuracy': 92.50,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.6, 'leniency': 1.10},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.6, 'leniency': 1.10}
+        }
+    },
+    'tony_harrington': {
+        'name': 'Tony Harrington',
+        'matches_total': 18,
+        'cards_per_match': 4.2,
+        'yellow_cards_avg': 3.7,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.0,  # Médio
+        'accuracy': 89.13,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.2, 'leniency': 1.0},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.2, 'leniency': 1.0}
+        }
+    },
+    'chris_kavanagh': {
+        'name': 'Chris Kavanagh',
+        'matches_total': 25,
+        'cards_per_match': 4.7,
+        'yellow_cards_avg': 4.2,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.12,  # Rigoroso
+        'accuracy': 84.21,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.7, 'leniency': 1.12},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.7, 'leniency': 1.12}
+        }
+    },
+    'sam_barrott': {
+        'name': 'Sam Barrott',
+        'matches_total': 24,
+        'cards_per_match': 4.8,
+        'yellow_cards_avg': 4.3,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.14,  # Rigoroso
+        'accuracy': 85.45,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.8, 'leniency': 1.14},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.8, 'leniency': 1.14}
+        }
+    },
+    'andy_madley': {
+        'name': 'Andy Madley',
+        'matches_total': 20,
+        'cards_per_match': 4.1,
+        'yellow_cards_avg': 3.6,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 0.98,  # Médio
+        'accuracy': 87.76,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.1, 'leniency': 0.98},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.1, 'leniency': 0.98}
+        }
+    },
+    'peter_bankes': {
+        'name': 'Peter Bankes',
+        'matches_total': 23,
+        'cards_per_match': 4.3,
+        'yellow_cards_avg': 3.8,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 1.02,  # Médio
+        'accuracy': 88.64,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.3, 'leniency': 1.02},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.3, 'leniency': 1.02}
+        }
+    },
+    'darren_england': {
+        'name': 'Darren England',
+        'matches_total': 20,
+        'cards_per_match': 4.0,
+        'yellow_cards_avg': 3.5,
+        'red_cards_avg': 0.5,
+        'leniency_factor': 0.95,  # Leniente
+        'accuracy': 88.89,
+        'by_competition': {
+            'premier_league': {'cards_avg': 4.0, 'leniency': 0.95},
+        },
+        'by_season': {
+            2024: {'cards_avg': 4.0, 'leniency': 0.95}
+        }
+    }
+}
+
+# Estatísticas por liga
 LEAGUE_REFEREE_STATS = {
     'brasileirao': {
         'avg_cards_per_match': 4.2,
-        'avg_yellow_cards': 3.7,
+        'avg_yellow_cards': 3.8,
+        'avg_red_cards': 0.4,
+        'referees': REFEREE_STATS
+    },
+    'premier_league': {
+        'avg_cards_per_match': 4.4,
+        'avg_yellow_cards': 3.9,
         'avg_red_cards': 0.5,
-        'total_referees': 10,
-        'season': 2024
+        'referees': PREMIER_LEAGUE_REFEREE_STATS
     }
 }
 
 
-def get_referee_stats(referee_key: str) -> dict:
-    """
-    Obtém estatísticas de um árbitro
-    
-    Args:
-        referee_key: Chave do árbitro (ex: 'anderson_daronco')
-        
-    Returns:
-        Dict com estatísticas do árbitro ou dict vazio se não encontrado
-    """
-    return REFEREE_STATS.get(referee_key, {})
-
-
-def get_referee_by_id(referee_id: str) -> dict:
-    """
-    Obtém estatísticas de um árbitro pelo ID
-    
-    Args:
-        referee_id: ID do árbitro
-        
-    Returns:
-        Dict com estatísticas do árbitro
-    """
-    referee_key = REFEREE_ID_MAP.get(referee_id)
-    if referee_key:
-        return get_referee_stats(referee_key)
-    return {}
+def get_referee_stats(referee_key: str, league: str = 'brasileirao') -> dict:
+    """Obter estatísticas de um árbitro"""
+    league_data = LEAGUE_REFEREE_STATS.get(league, {})
+    referees = league_data.get('referees', {})
+    return referees.get(referee_key, {})
 
 
 def get_leniency_factor(referee_key: str, competition: str = 'brasileirao', season: int = 2024) -> float:
-    """
-    Obtém fator de leniência de um árbitro
+    """Obter fator de leniência do árbitro"""
+    stats = get_referee_stats(referee_key, competition)
+    if not stats:
+        return 1.0  # Padrão
     
-    Args:
-        referee_key: Chave do árbitro
-        competition: Competição (brasileirao, copa_do_brasil, etc)
-        season: Temporada
-        
-    Returns:
-        Fator de leniência (1.0 = média, >1.0 = rigoroso, <1.0 = leniente)
-    """
-    referee = get_referee_stats(referee_key)
+    # Tentar obter por temporada específica
+    season_data = stats.get('by_season', {}).get(season)
+    if season_data:
+        return season_data.get('leniency', stats.get('leniency_factor', 1.0))
     
-    if not referee:
-        return 1.0  # Árbitro desconhecido = média
-    
-    # Preferir dados específicos da competição
-    if competition in referee.get('by_competition', {}):
-        return referee['by_competition'][competition].get('leniency', 1.0)
-    
-    # Preferir dados específicos da temporada
-    if season in referee.get('by_season', {}):
-        return referee['by_season'][season].get('leniency', 1.0)
-    
-    # Fallback para média geral
-    return referee.get('leniency_factor', 1.0)
+    return stats.get('leniency_factor', 1.0)
 
 
 def get_avg_cards(referee_key: str, competition: str = 'brasileirao', season: int = 2024) -> float:
-    """
-    Obtém média de cartões de um árbitro
+    """Obter média de cartões do árbitro"""
+    stats = get_referee_stats(referee_key, competition)
+    if not stats:
+        league_data = LEAGUE_REFEREE_STATS.get(competition, {})
+        return league_data.get('avg_cards_per_match', 4.2)
     
-    Args:
-        referee_key: Chave do árbitro
-        competition: Competição
-        season: Temporada
-        
-    Returns:
-        Média de cartões por jogo
-    """
-    referee = get_referee_stats(referee_key)
+    # Tentar obter por temporada específica
+    season_data = stats.get('by_season', {}).get(season)
+    if season_data:
+        return season_data.get('cards_avg', stats.get('cards_per_match', 4.2))
     
-    if not referee:
-        return LEAGUE_REFEREE_STATS['brasileirao']['avg_cards_per_match']
-    
-    # Preferir dados específicos da competição
-    if competition in referee.get('by_competition', {}):
-        return referee['by_competition'][competition].get('cards_avg', referee.get('cards_per_match', 4.2))
-    
-    # Preferir dados específicos da temporada
-    if season in referee.get('by_season', {}):
-        return referee['by_season'][season].get('cards_avg', referee.get('cards_per_match', 4.2))
-    
-    # Fallback para média geral
-    return referee.get('cards_per_match', 4.2)
+    return stats.get('cards_per_match', 4.2)
 
 
 def classify_referee_style(leniency_factor: float) -> str:
-    """
-    Classifica o estilo de arbitragem
-    
-    Args:
-        leniency_factor: Fator de leniência
-        
-    Returns:
-        Classificação (Rigoroso, Médio, Leniente)
-    """
-    if leniency_factor > 1.08:
+    """Classificar estilo do árbitro"""
+    if leniency_factor > 1.10:
+        return "🔴 Muito Rigoroso"
+    elif leniency_factor > 1.05:
         return "🔴 Rigoroso"
-    elif leniency_factor < 0.92:
+    elif leniency_factor > 0.95:
+        return "🟡 Médio"
+    elif leniency_factor > 0.90:
         return "🟢 Leniente"
     else:
-        return "🟡 Médio"
+        return "🟢 Muito Leniente"
+
+
+def get_league_referees(league: str = 'brasileirao') -> dict:
+    """Obter todos os árbitros de uma liga"""
+    league_data = LEAGUE_REFEREE_STATS.get(league, {})
+    return league_data.get('referees', {})
+
+
+def get_top_referees(league: str = 'brasileirao', limit: int = 5) -> list:
+    """Obter top árbitros por acurácia"""
+    referees = get_league_referees(league)
+    sorted_refs = sorted(
+        referees.items(),
+        key=lambda x: x[1].get('accuracy', 0),
+        reverse=True
+    )
+    return sorted_refs[:limit]
