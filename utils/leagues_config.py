@@ -15,6 +15,7 @@ LEAGUES = {
         'api': {
             'provider': 'football_data',
             'league_id': 2013,
+            'league_code': 'BSA',  # Código correto para API v4
             'api_key': os.getenv('FOOTBALL_DATA_API_KEY'),
             'base_url': 'https://api.football-data.org/v4'
         },
@@ -40,10 +41,11 @@ LEAGUES = {
         'season': 2024,  # 2024/25
         'icon': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
         'api': {
-            'provider': 'footystats',  # Gratuito!
-            'league_id': 1626,  # 2024/25 season
-            'api_key': 'test85g57',
-            'base_url': 'https://api.footystats.org/api'
+            'provider': 'football_data',
+            'league_id': 2021,
+            'league_code': 'PL',  # Código correto para API v4
+            'api_key': os.getenv('FOOTBALL_DATA_API_KEY'),
+            'base_url': 'https://api.football-data.org/v4'
         },
         'stats': {
             'league_avg_goals': 2.69,
