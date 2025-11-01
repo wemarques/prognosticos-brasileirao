@@ -33,13 +33,21 @@ class FootballDataCollector:
         self.api_key = os.getenv("FOOTBALL_DATA_API_KEY") or os.getenv("API_FOOTBALL_KEY")
         self.base_url = "https://api.football-data.org/v4"
         self.headers = {"X-Auth-Token": self.api_key}
-        self.brasileirao_id = 2013  # BSA
+        self.brasileirao_code = "BSA"  # Usar código ao invés de ID numérico
+        self.premier_league_code = "PL"  # Código Premier League
         self.current_season = 2025
     
-    def get_competition_info(self) -> Dict:
-        """Busca informações da competição (Brasileirão)"""
-        endpoint = f"{self.base_url}/competitions/{self.brasileirao_id}"
+    def get_competition_info(self, league_code: str = "BSA") -> Dict:
+        """Busca informações da competição
         
+        Args:
+            league_code: Código da liga (BSA para Brasileirão, PL para Premier League)
+        
+        Returns:
+            Dicionário com informações da competição
+        """
+        endpoint = f"{self.base_url}/competitions/{league_code}"
+
         try:
             response = requests.get(endpoint, headers=self.headers, timeout=10)
             response.raise_for_status()
@@ -48,21 +56,22 @@ class FootballDataCollector:
             print(f"Erro ao buscar info da competição: {e}")
             return {}
     
-    def get_teams(self, season: int = None) -> List[Dict]:
+    def get_teams(self, league_code: str = "BSA", season: int = None) -> List[Dict]:
         """
-        Busca todos os times do Brasileirão
+        Busca todos os times da liga
         
         Args:
+            league_code: Código da liga (BSA ou PL)
             season: Ano da temporada (ex: 2025)
-            
+
         Returns:
             Lista de times com IDs e informações
         """
-        endpoint = f"{self.base_url}/competitions/{self.brasileirao_id}/teams"
+        endpoint = f"{self.base_url}/competitions/{league_code}/teams"
         params = {}
         if season:
             params['season'] = season
-        
+
         try:
             response = requests.get(endpoint, headers=self.headers, params=params, timeout=10)
             response.raise_for_status()
@@ -402,4 +411,3 @@ if __name__ == "__main__":
         print("✅ Classificação obtida")
     else:
         print("❌ Classificação não disponível")
-
