@@ -11,16 +11,21 @@ class MonteCarloSimulator:
         self,
         lambda_home: float,
         lambda_away: float,
-        rho: float = -0.11
+        correlation_k: float = 0.15
     ) -> Dict:
         """
-        Simula N jogos usando Poisson bivariada
+        Simula N jogos usando Poisson bivariada com correlação positiva
+        
+        Args:
+            lambda_home: Taxa esperada de gols do mandante
+            lambda_away: Taxa esperada de gols do visitante
+            correlation_k: Coeficiente de correlação positivo (padrão 0.15)
         
         Returns:
             Dict com estatísticas das simulações
         """
-        # Componente comum
-        lambda_0 = max(0, rho * min(lambda_home, lambda_away))
+        # Componente comum (correlação positiva)
+        lambda_0 = correlation_k * min(lambda_home, lambda_away)
         lambda_h = lambda_home - lambda_0
         lambda_a = lambda_away - lambda_0
         

@@ -22,7 +22,12 @@ logger = logging.getLogger(__name__)
 
 def normalize_expected_goals(home_xg: float, away_xg: float) -> tuple:
     """
-    Normaliza gols esperados baseado em dados recentes do Brasileirão 2025
+    Normaliza gols esperados com calibração melhorada para Brasileirão 2025
+    
+    Usa scaling + offset baseado em análise de dados históricos:
+    - Scaling: 0.72 (redução de 28% em vez de 35% fixo)
+    - Offset: -0.15 (ajuste para jogos defensivos)
+    - Cap máximo: 3.2 (mais realista que 3.5)
     
     Args:
         home_xg: Expected goals do mandante
@@ -31,13 +36,15 @@ def normalize_expected_goals(home_xg: float, away_xg: float) -> tuple:
     Returns:
         Tupla (home_xg_normalized, away_xg_normalized)
     """
-    reduction_factor = 0.65  # Reduz em 35%
+    scaling_factor = 0.72  # Reduz em 28% (mais conservador que 0.65)
+    offset = -0.15  # Ajuste para baixo em jogos defensivos
     
-    home_xg_normalized = home_xg * reduction_factor
-    away_xg_normalized = away_xg * reduction_factor
+    home_xg_normalized = (home_xg * scaling_factor) + offset
+    away_xg_normalized = (away_xg * scaling_factor) + offset
     
-    home_xg_normalized = min(home_xg_normalized, 3.5)
-    away_xg_normalized = min(away_xg_normalized, 3.5)
+    # Garantir valores mínimos e máximos realistas
+    home_xg_normalized = max(0.3, min(home_xg_normalized, 3.2))
+    away_xg_normalized = max(0.3, min(away_xg_normalized, 3.2))
     
     logger.debug(f"Normalized xG: {home_xg:.2f} -> {home_xg_normalized:.2f}, {away_xg:.2f} -> {away_xg_normalized:.2f}")
     
@@ -47,6 +54,9 @@ def normalize_expected_goals(home_xg: float, away_xg: float) -> tuple:
 def adjust_probabilities_for_defensive_games(home_xg: float, away_xg: float, home_win: float, draw: float, away_win: float) -> tuple:
     """
     Ajusta probabilidades para jogos defensivos (baixo xG)
+    
+    Com correlação positiva no Dixon-Coles, o ajuste de empates é menor.
+    Anteriormente era +35%, agora é +20% pois a correlação já captura parte do efeito.
     
     Args:
         home_xg: Expected goals do mandante
@@ -61,10 +71,10 @@ def adjust_probabilities_for_defensive_games(home_xg: float, away_xg: float, hom
     if home_xg < 1.0 and away_xg < 1.0:
         logger.debug(f"Defensive game detected (xG < 1.0). Adjusting draw probability.")
         
-        draw_adj = draw * 1.35
+        draw_adj = draw * 1.20
         
-        home_win_adj = home_win * 0.85
-        away_win_adj = away_win * 0.85
+        home_win_adj = home_win * 0.90
+        away_win_adj = away_win * 0.90
     else:
         home_win_adj = home_win
         draw_adj = draw
@@ -162,6 +172,7 @@ class PrognosisCalculator:
         self.model = DixonColesModel(brasileirao_mode=brasileirao_mode)
         self.simulator = MonteCarloSimulator(n_simulations=50000)
         self.calibrator = BrasileiraoCalibrator()
+        self.brasileirao_mode = brasileirao_mode
     
     def calculate_full_prognosis(
         self,
@@ -221,8 +232,12 @@ class PrognosisCalculator:
         # 3. Calcular probabilidades (Dixon-Coles)
         probs = self.model.calculate_match_probabilities(lambda_home_normalized, lambda_away_normalized)
         
-        # 4. Simular com Monte Carlo
-        mc_results = self.simulator.simulate_match(lambda_home_normalized, lambda_away_normalized)
+        # 4. Simular com Monte Carlo usando mesma correlação do modelo
+        mc_results = self.simulator.simulate_match(
+            lambda_home_normalized, 
+            lambda_away_normalized,
+            correlation_k=self.model.correlation_k
+        )
         
         logger.debug(f"Initial probabilities: H={mc_results['p_home_wins']:.1%} D={mc_results['p_draws']:.1%} A={mc_results['p_away_wins']:.1%}")
         
