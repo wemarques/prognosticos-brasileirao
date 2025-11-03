@@ -100,5 +100,6 @@ class MonteCarloSimulator:
             'p_over_75': (corners > 7.5).sum() / self.n_simulations,
             'p_over_85': (corners > 8.5).sum() / self.n_simulations,
             'p_over_95': (corners > 9.5).sum() / self.n_simulations,
+            'p_over_105': (corners > 10.5).sum() / self.n_simulations,
             'avg_corners': corners.mean(),
         }

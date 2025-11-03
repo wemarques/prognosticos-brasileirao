@@ -269,7 +269,17 @@ class PrognosisCalculator:
         
         logger.info(f"Prognóstico calculado com sucesso")
         
-        # 9. Compilar resultado final
+        for key in list(corners_results.keys()):
+            if key.startswith('p_over_'):
+                new_key = key.replace('p_over_', 'over_')
+                corners_results[new_key] = corners_results[key]
+        
+        for key in list(cards_results.keys()):
+            if key.startswith('p_over_'):
+                new_key = key.replace('p_over_', 'over_')
+                cards_results[new_key] = cards_results[key]
+        
+        # 11. Compilar resultado final
         return {
             'lambdas': {
                 'home': lambda_home_normalized,
@@ -284,6 +294,9 @@ class PrognosisCalculator:
                 'over_25': probs['p_over_25_calibrated'],
                 'over_35': mc_results['p_over_35'],
             },
+            'home_win_prob': home_win_adj,
+            'draw_prob': draw_adj,
+            'away_win_prob': away_win_adj,
             'cards': cards_results,
             'corners': corners_results,
             'top_scores': mc_results['top_5_scores'],
