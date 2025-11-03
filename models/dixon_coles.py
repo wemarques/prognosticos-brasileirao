@@ -11,12 +11,12 @@ class DixonColesModel:
             brasileirao_mode: Se True, usa calibrações específicas do BR
         """
         if brasileirao_mode:
-            self.hfa = 1.53  # Home Field Advantage Brasileirão
-            self.ava = 0.85  # Away disadvantage
+            self.hfa = 1.38  # Home Field Advantage (reduzido de 1.53)
+            self.ava = 0.88  # Away disadvantage (ajustado de 0.85)
             self.league_avg_goals = 1.82
             self.league_avg_xg = 1.40
-            self.rho = -0.11  # Correlação entre gols
-            self.home_advantage = 0.45  # Recalibrado para 2025
+            self.correlation_k = 0.15  # Correlação positiva (era rho=-0.11, agora k positivo)
+            self.home_advantage = 0.45  # Vantagem de casa adicional
             self.attack_strength = 1.15  # Força de ataque média calibrada
             self.defense_strength = 0.95  # Força de defesa média calibrada
         else:
@@ -25,7 +25,10 @@ class DixonColesModel:
             self.ava = 0.95
             self.league_avg_goals = 2.74
             self.league_avg_xg = 1.40
-            self.rho = -0.13
+            self.correlation_k = 0.12  # Correlação positiva para PL
+            self.home_advantage = 0.35
+            self.attack_strength = 1.10
+            self.defense_strength = 0.98
     
     def calculate_lambda(
         self,
@@ -35,7 +38,7 @@ class DixonColesModel:
         adjustments: Dict = None
     ) -> float:
         """
-        Calcula lambda (taxa esperada de gols)
+        Calcula lambda (taxa esperada de gols) com calibração integrada
         
         Args:
             xg_for: xG do time atacante
@@ -46,15 +49,16 @@ class DixonColesModel:
         Returns:
             Lambda calibrado
         """
-        # Cálculo base
-        attack_strength = xg_for / self.league_avg_xg
-        defense_weakness = xgc_against / self.league_avg_xg
+        # Cálculo base com parâmetros de calibração integrados
+        attack_strength = (xg_for / self.league_avg_xg) * self.attack_strength
+        defense_weakness = (xgc_against / self.league_avg_xg) * self.defense_strength
         
         lambda_base = attack_strength * defense_weakness * self.league_avg_goals
         
-        # Aplicar HFA/AVA
+        # Aplicar HFA/AVA com vantagem de casa adicional
         if is_home:
             lambda_adj = lambda_base * self.hfa
+            lambda_adj += self.home_advantage
         else:
             lambda_adj = lambda_base * self.ava
         
@@ -94,8 +98,9 @@ class DixonColesModel:
         max_goals = 10
         prob_matrix = np.zeros((max_goals, max_goals))
         
-        # Componente comum (correlação)
-        lambda_0 = max(0, self.rho * min(lambda_home, lambda_away))
+        # Componente comum (correlação positiva)
+        # Usa correlation_k positivo para capturar dependência entre gols
+        lambda_0 = self.correlation_k * min(lambda_home, lambda_away)
         lambda_1 = lambda_home - lambda_0
         lambda_2 = lambda_away - lambda_0
         
