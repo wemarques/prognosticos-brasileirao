@@ -71,6 +71,13 @@ try:
 except Exception:
     pass
 
+try:
+    from ui.league_selector import render_league_selector, get_league_info
+    from ui.round_analysis import show_round_analysis
+    UI_MODULES_AVAILABLE = True
+except Exception:
+    UI_MODULES_AVAILABLE = False
+
 # Mapeamento de times
 BRASILEIRAO_TEAMS = {
     'Flamengo': 127,
@@ -152,6 +159,32 @@ def show_system_status():
             st.info("🚀 **Modo:** Produção Completa")
         else:
             st.warning("🧪 **Modo:** Demonstração")
+    
+    with st.sidebar:
+        st.markdown("---")
+        st.header("⚽ Liga e Rodada")
+        
+        if UI_MODULES_AVAILABLE:
+            try:
+                selected_league = render_league_selector()
+                league_info = get_league_info(selected_league)
+            except Exception as e:
+                st.warning(f"⚠️ Erro ao carregar seletor de liga: {e}")
+                selected_league = "brasileirao"
+        else:
+            st.info("📌 Liga: Brasileirão (padrão)")
+            selected_league = "brasileirao"
+        
+        rodada = st.number_input(
+            "🏆 Rodada",
+            min_value=1,
+            max_value=38,
+            value=1,
+            step=1,
+            help="Selecione a rodada para análise"
+        )
+        
+        return selected_league, rodada
 
 
 def generate_prognosis_real(home_team, away_team, context):
@@ -171,8 +204,8 @@ def generate_prognosis_real(home_team, away_team, context):
         raise ValueError("Time não encontrado no mapeamento")
     
     # Buscar estatísticas
-    home_api_stats = collector.get_team_stats(home_id)
-    away_api_stats = collector.get_team_stats(away_id)
+    home_api_stats = collector.calculate_team_stats(home_id, venue="HOME")
+    away_api_stats = collector.calculate_team_stats(away_id, venue="AWAY")
     
     # Buscar H2H
     h2h_matches = collector.get_h2h(home_id, away_id, last=5)
@@ -514,8 +547,8 @@ def main():
                 unsafe_allow_html=True)
     st.markdown("---")
     
-    # Status na sidebar
-    show_system_status()
+    # Status na sidebar e obter seleções
+    selected_league, rodada = show_system_status()
     
     # Sidebar - Configurações
     with st.sidebar:
@@ -537,6 +570,31 @@ def main():
         st.error("❌ Sistema indisponível - bibliotecas científicas não carregadas")
         return
     
+    # Seletor de modo de análise
+    st.subheader("📊 Modo de Análise")
+    analysis_mode = st.radio(
+        "Escolha o tipo de análise:",
+        ["🎯 Jogo Específico (Time vs Time)", "📋 Todos os Jogos da Rodada"],
+        index=0,
+        horizontal=True
+    )
+    
+    st.markdown("---")
+    
+    if analysis_mode == "📋 Todos os Jogos da Rodada":
+        if UI_MODULES_AVAILABLE:
+            try:
+                show_round_analysis(rodada)
+            except Exception as e:
+                st.error(f"❌ Erro ao exibir análise da rodada: {e}")
+                with st.expander("🐛 Detalhes do Erro"):
+                    import traceback
+                    st.code(traceback.format_exc())
+        else:
+            st.warning("⚠️ Módulo de análise de rodada não disponível. Use o modo 'Jogo Específico'.")
+        return
+    
+    # Modo "Jogo Específico" - continua com a seleção de times
     # Seleção de times
     col1, col2 = st.columns(2)
     
