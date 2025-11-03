@@ -19,14 +19,10 @@ class MultiLeagueProcessor:
     
     def __init__(self):
         """Inicializa o processador multi-liga"""
-        self.processors = {}
-        self.batch_processors = {}
         self.timezone_converter = TimezoneConverter()
         
-        # Inicializar processadores para cada liga
-        for league_key in get_available_leagues():
-            self.processors[league_key] = DataProcessorWithReferee()
-            self.batch_processors[league_key] = BatchMatchProcessor(max_workers=4)
+        self._shared_processor = DataProcessorWithReferee()
+        self._shared_batch_processor = BatchMatchProcessor(max_workers=4)
     
     def process_match(
         self,
@@ -62,13 +58,11 @@ class MultiLeagueProcessor:
             league_config = get_league_config(league)
             competition = league_config.get('code', league)
         
-        # Obter processador da liga
-        processor = self.processors.get(league)
-        if not processor:
+        if league not in get_available_leagues():
             raise ValueError(f"Liga não suportada: {league}")
         
-        # Processar match
-        processed = processor.process_match_with_referee_and_timezone(
+        # Processar match usando processador compartilhado
+        processed = self._shared_processor.process_match_with_referee_and_timezone(
             home_stats=home_stats,
             away_stats=away_stats,
             h2h_data=h2h_data,
@@ -102,13 +96,11 @@ class MultiLeagueProcessor:
         Returns:
             Resultados do processamento
         """
-        # Obter processador em lote da liga
-        batch_processor = self.batch_processors.get(league)
-        if not batch_processor:
+        if league not in get_available_leagues():
             raise ValueError(f"Liga não suportada: {league}")
         
-        # Processar rodada
-        results = batch_processor.process_round(
+        # Processar rodada usando processador compartilhado
+        results = self._shared_batch_processor.process_round(
             matches,
             competition=league,
             show_progress=show_progress
