@@ -16,6 +16,9 @@ class DixonColesModel:
             self.league_avg_goals = 1.82
             self.league_avg_xg = 1.40
             self.rho = -0.11  # Correlação entre gols
+            self.home_advantage = 0.45  # Recalibrado para 2025
+            self.attack_strength = 1.15  # Força de ataque média calibrada
+            self.defense_strength = 0.95  # Força de defesa média calibrada
         else:
             # Valores Premier League
             self.hfa = 1.18
