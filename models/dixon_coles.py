@@ -7,25 +7,33 @@ class DixonColesModel:
     
     def __init__(self, brasileirao_mode=True):
         """
+        Initialize Dixon-Coles model with calibrated parameters.
+        
         Args:
-            brasileirao_mode: Se True, usa calibrações específicas do BR
+            brasileirao_mode: If True, use parameters calibrated for Brasileirão Série A
         """
         if brasileirao_mode:
-            self.hfa = 1.38  # Home Field Advantage (reduzido de 1.53)
-            self.ava = 0.88  # Away disadvantage (ajustado de 0.85)
-            self.league_avg_goals = 1.82
+            self.hfa = 1.35
+            self.ava = 0.92
+            self.league_avg_goals = 1.65
+            self.rho = -0.12
             self.league_avg_xg = 1.40
-            self.correlation_k = 0.15  # Correlação positiva (era rho=-0.11, agora k positivo)
-            self.home_advantage = 0.45  # Vantagem de casa adicional
-            self.attack_strength = 1.15  # Força de ataque média calibrada
-            self.defense_strength = 0.95  # Força de defesa média calibrada
+            self.correlation_k = 0.15
+            self.home_advantage = 0.30
+            self.attack_strength = 1.10
+            self.defense_strength = 0.95
+            
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("🎯 Dixon-Coles initialized for Brasileirão with calibrated parameters")
+            logger.info(f"  HFA: {self.hfa}, AVA: {self.ava}, Avg Goals: {self.league_avg_goals}")
         else:
-            # Valores Premier League
             self.hfa = 1.18
             self.ava = 0.95
             self.league_avg_goals = 2.74
+            self.rho = -0.15
             self.league_avg_xg = 1.40
-            self.correlation_k = 0.12  # Correlação positiva para PL
+            self.correlation_k = 0.12
             self.home_advantage = 0.35
             self.attack_strength = 1.10
             self.defense_strength = 0.98
@@ -38,7 +46,8 @@ class DixonColesModel:
         adjustments: Dict = None
     ) -> float:
         """
-        Calcula lambda (taxa esperada de gols) com calibração integrada
+        Calculate expected goals (lambda) for a team.
+        Calibrated for realistic Brasileirão predictions.
         
         Args:
             xg_for: xG do time atacante
@@ -49,20 +58,17 @@ class DixonColesModel:
         Returns:
             Lambda calibrado
         """
-        # Cálculo base com parâmetros de calibração integrados
         attack_strength = (xg_for / self.league_avg_xg) * self.attack_strength
         defense_weakness = (xgc_against / self.league_avg_xg) * self.defense_strength
         
         lambda_base = attack_strength * defense_weakness * self.league_avg_goals
         
-        # Aplicar HFA/AVA com vantagem de casa adicional
         if is_home:
             lambda_adj = lambda_base * self.hfa
             lambda_adj += self.home_advantage
         else:
             lambda_adj = lambda_base * self.ava
         
-        # Aplicar ajustes contextuais
         if adjustments:
             if 'travel_factor' in adjustments and not is_home:
                 lambda_adj *= adjustments['travel_factor']
@@ -76,10 +82,39 @@ class DixonColesModel:
             if 'absences_impact' in adjustments:
                 lambda_adj += adjustments['absences_impact']
         
-        # Floor e cap
-        lambda_adj = max(0.25, min(3.5, lambda_adj))
+        lambda_adj = max(0.3, min(lambda_adj, 3.5))
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"📊 Lambda calculated: {lambda_adj:.2f} (is_home={is_home})")
         
         return lambda_adj
+    
+    def calculate_lambdas(self, home_attack, home_defense, away_attack, away_defense, venue="HOME"):
+        """
+        Calculate expected goals (lambda) for home and away teams.
+        Calibrated for realistic Brasileirão predictions.
+        """
+        home_attack_norm = home_attack / self.league_avg_goals
+        home_defense_norm = home_defense / self.league_avg_goals
+        away_attack_norm = away_attack / self.league_avg_goals
+        away_defense_norm = away_defense / self.league_avg_goals
+        
+        if venue == "HOME":
+            lambda_home = self.league_avg_goals * home_attack_norm * away_defense_norm * self.hfa
+            lambda_away = self.league_avg_goals * away_attack_norm * home_defense_norm * self.ava
+        else:
+            lambda_home = self.league_avg_goals * home_attack_norm * away_defense_norm
+            lambda_away = self.league_avg_goals * away_attack_norm * home_defense_norm
+        
+        lambda_home = max(0.3, min(lambda_home, 3.5))
+        lambda_away = max(0.3, min(lambda_away, 3.5))
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"📊 Lambdas calculados: Home={lambda_home:.2f}, Away={lambda_away:.2f}, Total={lambda_home+lambda_away:.2f}")
+        
+        return lambda_home, lambda_away
     
     def bivariate_poisson(
         self,
