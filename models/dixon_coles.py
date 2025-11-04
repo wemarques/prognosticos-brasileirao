@@ -157,6 +157,61 @@ class DixonColesModel:
         
         return prob_matrix, home_goals, away_goals
     
+    def adjust_draw_probability(self, prob_home, prob_draw, prob_away, lambda_home, lambda_away):
+        """
+        Adjust draw probability for defensive games.
+        
+        Args:
+            prob_home: Home win probability
+            prob_draw: Draw probability
+            prob_away: Away win probability
+            lambda_home: Home expected goals
+            lambda_away: Away expected goals
+        
+        Returns:
+            tuple: Adjusted (prob_home, prob_draw, prob_away) that sum to 1.0
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        is_defensive = lambda_home < 1.2 and lambda_away < 1.2
+        
+        if is_defensive:
+            draw_boost = 0.10
+            
+            logger.info(f"🛡️ Jogo defensivo detectado (λH={lambda_home:.2f}, λA={lambda_away:.2f})")
+            logger.info(f"   Empate antes: {prob_draw:.1%}")
+            
+            new_draw = min(prob_draw + draw_boost, 0.40)
+            
+            diff = new_draw - prob_draw
+            if diff > 0:
+                total_win_prob = prob_home + prob_away
+                if total_win_prob > 0:
+                    ratio_home = prob_home / total_win_prob
+                    ratio_away = prob_away / total_win_prob
+                    
+                    new_home = prob_home - (diff * ratio_home)
+                    new_away = prob_away - (diff * ratio_away)
+                else:
+                    new_home = prob_home
+                    new_away = prob_away
+            else:
+                new_home = prob_home
+                new_away = prob_away
+            
+            logger.info(f"   Empate depois: {new_draw:.1%} (+{diff:.1%})")
+            
+            total = new_home + new_draw + new_away
+            new_home /= total
+            new_draw /= total
+            new_away /= total
+            
+            return new_home, new_draw, new_away
+        else:
+            logger.info(f"⚔️ Jogo ofensivo (λH={lambda_home:.2f}, λA={lambda_away:.2f}) - sem ajuste de empate")
+            return prob_home, prob_draw, prob_away
+    
     def calculate_match_probabilities(
         self,
         lambda_home: float,
@@ -174,6 +229,10 @@ class DixonColesModel:
         p_home_win = prob_matrix[np.triu_indices_from(prob_matrix, k=1)].sum()
         p_draw = np.diag(prob_matrix).sum()
         p_away_win = prob_matrix[np.tril_indices_from(prob_matrix, k=-1)].sum()
+        
+        p_home_win, p_draw, p_away_win = self.adjust_draw_probability(
+            p_home_win, p_draw, p_away_win, lambda_home, lambda_away
+        )
         
         # Total de gols
         total_goals_dist = np.zeros(20)
