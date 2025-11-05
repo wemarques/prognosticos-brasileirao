@@ -36,6 +36,9 @@ class FootballDataCollector:
         self.brasileirao_code = "BSA"  # Usar código ao invés de ID numérico
         self.premier_league_code = "PL"  # Código Premier League
         self.current_season = 2025
+        
+        # Backward compatibility - CORREÇÃO DO BUG brasileiro_id (Prompt 0.1-0.2)
+        self.brasileiro_id = self.brasileirao_code
     
     def get_competition_info(self, league_code: str = "BSA") -> Dict:
         """Busca informações da competição
