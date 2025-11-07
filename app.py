@@ -52,9 +52,10 @@ def display_stake_calculation(probabilities, bankroll, kelly_fraction):
             st.warning("⚠️ Não é uma value bet (edge negativo)")
 
 def display_roi_simulation(bankroll, kelly_fraction):
-    """Display ROI simulation section with adjustable parameters"""
-    with st.expander("📊 Simulação de ROI", expanded=False):
+    """Display ROI simulation section with adjustable parameters and Monte Carlo scenarios"""
+    with st.expander("📊 Simulação de ROI (Monte Carlo)", expanded=False):
         st.subheader("Simular Retorno sobre Investimento")
+        st.info("💡 Simulação com 1000 iterações Monte Carlo para análise estatística")
         
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -64,7 +65,8 @@ def display_roi_simulation(bankroll, kelly_fraction):
                 max_value=50,
                 value=5,
                 step=1,
-                help="Número médio de apostas por semana"
+                help="Número médio de apostas por semana",
+                key="roi_bets_per_week"
             )
         with col2:
             avg_edge = st.number_input(
@@ -73,7 +75,8 @@ def display_roi_simulation(bankroll, kelly_fraction):
                 max_value=20.0,
                 value=8.0,
                 step=0.5,
-                help="Edge médio sobre a casa de apostas"
+                help="Edge médio sobre a casa de apostas",
+                key="roi_avg_edge"
             ) / 100
         with col3:
             win_rate = st.number_input(
@@ -82,36 +85,53 @@ def display_roi_simulation(bankroll, kelly_fraction):
                 max_value=80.0,
                 value=55.0,
                 step=1.0,
-                help="Taxa de acerto esperada"
+                help="Taxa de acerto esperada",
+                key="roi_win_rate"
             ) / 100
         
-        if st.button("🎲 Simular ROI"):
-            simulator = ROISimulator(bankroll, kelly_fraction)
-            results = simulator.simulate_multiple_periods(avg_bets_per_week, avg_edge, win_rate)
-            
-            st.markdown("### Resultados da Simulação")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(
-                    "30 dias (4 semanas)",
-                    f"R$ {results['4_weeks']['final_bankroll']:.2f}",
-                    f"{results['4_weeks']['roi_percent']:+.2f}%"
-                )
-            with col2:
-                st.metric(
-                    "60 dias (8 semanas)",
-                    f"R$ {results['8_weeks']['final_bankroll']:.2f}",
-                    f"{results['8_weeks']['roi_percent']:+.2f}%"
-                )
-            with col3:
-                st.metric(
-                    "90 dias (12 semanas)",
-                    f"R$ {results['12_weeks']['final_bankroll']:.2f}",
-                    f"{results['12_weeks']['roi_percent']:+.2f}%"
-                )
-            
-            st.info(f"ℹ️ Simulação baseada em: {avg_bets_per_week} apostas/semana, {avg_edge*100:.1f}% edge, {win_rate*100:.1f}% win rate")
+        if st.button("🎲 Simular ROI", key="simulate_roi_button"):
+            with st.spinner("Executando 1000 simulações Monte Carlo..."):
+                try:
+                    simulator = ROISimulator(bankroll, kelly_fraction)
+                    results = simulator.simulate_multiple_periods(avg_bets_per_week, avg_edge, win_rate)
+                    
+                    st.markdown("### Resultados da Simulação Monte Carlo")
+                    
+                    for period_key, period_name in [('4_weeks', '30 dias'), ('8_weeks', '60 dias'), ('12_weeks', '90 dias')]:
+                        st.markdown(f"#### {period_name} ({results[period_key]['days']} dias)")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.markdown("**😰 Pessimista (10%)**")
+                            st.metric(
+                                "Banca Final",
+                                f"R$ {results[period_key]['scenarios']['pessimistic']['final_bankroll']:.2f}",
+                                f"{results[period_key]['scenarios']['pessimistic']['roi_percent']:+.2f}%"
+                            )
+                        
+                        with col2:
+                            st.markdown("**😐 Realista (50%)**")
+                            st.metric(
+                                "Banca Final",
+                                f"R$ {results[period_key]['scenarios']['realistic']['final_bankroll']:.2f}",
+                                f"{results[period_key]['scenarios']['realistic']['roi_percent']:+.2f}%"
+                            )
+                        
+                        with col3:
+                            st.markdown("**😄 Otimista (90%)**")
+                            st.metric(
+                                "Banca Final",
+                                f"R$ {results[period_key]['scenarios']['optimistic']['final_bankroll']:.2f}",
+                                f"{results[period_key]['scenarios']['optimistic']['roi_percent']:+.2f}%"
+                            )
+                        
+                        st.markdown("---")
+                    
+                    st.success(f"✅ Simulação completa: {avg_bets_per_week} apostas/semana, {avg_edge*100:.1f}% edge, {win_rate*100:.1f}% win rate")
+                
+                except Exception as e:
+                    st.error(f"❌ Erro na simulação: {e}")
 
 # Seletor de liga
 selected_league = render_league_selector()
