@@ -6,8 +6,26 @@ from collectors.fixtures_collector import FixturesCollector
 from collectors.teams_collector import get_teams_list
 from modules.roi.kelly_criterion import KellyCriterion
 from modules.roi.roi_simulator import ROISimulator
+from leagues.league_registry import LeagueRegistry
+from models.dixon_coles import DixonColesModel
 
 st.set_page_config(page_title="Prognósticos de Futebol", layout="wide")
+
+st.sidebar.header("⚙️ Configurações")
+
+available_leagues = LeagueRegistry.get_available_leagues()
+selected_league_key = st.sidebar.selectbox(
+    "Liga:",
+    options=list(available_leagues.keys()),
+    format_func=lambda x: available_leagues[x]
+)
+
+try:
+    model = DixonColesModel(selected_league_key)
+    st.sidebar.success(f"✅ {model.league.name} carregado")
+except Exception as e:
+    st.sidebar.error(f"❌ Erro ao carregar liga: {e}")
+    st.stop()
 
 def display_stake_calculation(probabilities, bankroll, kelly_fraction):
     """Display Kelly Criterion stake calculation for Over 2.5 goals"""

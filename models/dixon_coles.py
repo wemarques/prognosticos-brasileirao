@@ -1,42 +1,40 @@
 import numpy as np
 from scipy.stats import poisson
 from typing import Tuple, Dict
+from leagues.league_registry import LeagueRegistry
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DixonColesModel:
     """Modelo Dixon-Coles calibrado para Brasileirão"""
     
-    def __init__(self, brasileirao_mode=True):
+    def __init__(self, league_key='brasileirao'):
         """
-        Initialize Dixon-Coles model with calibrated parameters.
+        Initialize Dixon-Coles model with league-specific parameters.
         
         Args:
-            brasileirao_mode: If True, use parameters calibrated for Brasileirão Série A
+            league_key: League identifier or league instance
         """
-        if brasileirao_mode:
-            self.hfa = 1.35
-            self.ava = 0.92
-            self.league_avg_goals = 1.65
-            self.rho = -0.12
-            self.league_avg_xg = 1.40
-            self.correlation_k = 0.15
-            self.home_advantage = 0.30
-            self.attack_strength = 1.10
-            self.defense_strength = 0.95
-            
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info("🎯 Dixon-Coles initialized for Brasileirão with calibrated parameters")
-            logger.info(f"  HFA: {self.hfa}, AVA: {self.ava}, Avg Goals: {self.league_avg_goals}")
+        if isinstance(league_key, str):
+            self.league = LeagueRegistry.get_league(league_key)
         else:
-            self.hfa = 1.18
-            self.ava = 0.95
-            self.league_avg_goals = 2.74
-            self.rho = -0.15
-            self.league_avg_xg = 1.40
-            self.correlation_k = 0.12
-            self.home_advantage = 0.35
-            self.attack_strength = 1.10
-            self.defense_strength = 0.98
+            self.league = league_key
+        
+        params = self.league.params
+        self.hfa = params['hfa']
+        self.ava = params['ava']
+        self.league_avg_goals = params['league_avg_goals']
+        self.rho = params['rho']
+        
+        self.league_avg_xg = 1.40
+        self.correlation_k = 0.15
+        self.home_advantage = 0.30
+        self.attack_strength = 1.10
+        self.defense_strength = 0.95
+        
+        logger.info(f"✅ Dixon-Coles initialized for {self.league.name}")
+        logger.info(f"  HFA: {self.hfa}, AVA: {self.ava}, Avg Goals: {self.league_avg_goals}")
     
     def calculate_lambda(
         self,
