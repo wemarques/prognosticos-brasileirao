@@ -13,11 +13,16 @@ st.set_page_config(page_title="Prognósticos de Futebol", layout="wide")
 
 st.sidebar.header("⚙️ Configurações")
 
+league_display = {
+    'brasileirao': '🇧🇷 Brasileirão Série A',
+    'premier_league': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League'
+}
+
 available_leagues = LeagueRegistry.get_available_leagues()
 selected_league_key = st.sidebar.selectbox(
     "Liga:",
     options=list(available_leagues.keys()),
-    format_func=lambda x: available_leagues[x]
+    format_func=lambda x: league_display.get(x, available_leagues[x])
 )
 
 try:
