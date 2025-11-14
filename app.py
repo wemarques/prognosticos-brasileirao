@@ -1,6 +1,7 @@
 import streamlit as st
+import os
 from ui.league_selector import render_league_selector, get_league_info
-from data.collectors.football_data_collector_v2 import FootballDataCollectorV2
+from data.collectors.hybrid_collector import HybridDataCollector
 from utils.leagues_config import get_api_config
 from collectors.fixtures_collector import FixturesCollector
 from collectors.teams_collector import get_teams_list
@@ -140,9 +141,9 @@ league_info = get_league_info(selected_league)
 # Exibir informações da liga
 st.title(f"{league_info['icon']} {league_info['name']}")
 
-# Criar collector com a liga selecionada
-api_config = get_api_config(selected_league)
-collector = FootballDataCollectorV2(selected_league, api_config)
+# Criar collector híbrido (CSV + Odds API)
+odds_api_key = os.getenv('ODDS_API_KEY')
+collector = HybridDataCollector(league_key=selected_league, odds_api_key=odds_api_key)
 
 if selected_league == 'brasileirao':
     fixtures_collector = FixturesCollector(league_id=2013)
@@ -150,6 +151,22 @@ else:
     fixtures_collector = None
 
 st.sidebar.header("⚙️ Configurações")
+
+# Informações sobre fonte de dados
+with st.sidebar.expander("📊 Fonte de Dados", expanded=False):
+    csv_info = collector.get_csv_info()
+    st.write(f"**Liga:** {csv_info['league']}")
+
+    for file_type, info in csv_info['files'].items():
+        if info['exists']:
+            st.success(f"✅ {file_type.title()}: {info['rows']} registros")
+        else:
+            st.error(f"❌ {file_type.title()}: Não encontrado")
+
+    if odds_api_key:
+        st.info("🎲 Odds: The Odds API")
+    else:
+        st.warning("⚠️ Odds API não configurada")
 
 st.sidebar.subheader("💰 Gestão de Banca")
 bankroll = st.sidebar.number_input(

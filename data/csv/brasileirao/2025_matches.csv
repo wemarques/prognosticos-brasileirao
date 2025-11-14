@@ -1,0 +1,21 @@
+id,round,date,home_team,away_team,home_score,away_score,status,referee,home_xg,away_xg,home_shots,away_shots,home_corners,away_corners,home_cards,away_cards
+1,1,2025-04-13 16:00,Flamengo,Palmeiras,2,1,FINISHED,Wilton Sampaio,1.85,1.42,15,12,6,4,3,2
+2,1,2025-04-13 18:30,São Paulo,Corinthians,1,1,FINISHED,Rafael Claus,1.20,1.15,10,11,5,5,4,3
+3,1,2025-04-13 19:00,Atlético-MG,Internacional,3,2,FINISHED,Anderson Daronco,2.10,1.80,18,14,7,6,2,3
+4,1,2025-04-14 16:00,Botafogo,Grêmio,2,0,FINISHED,Raphael Claus,1.65,0.95,13,8,5,3,3,1
+5,1,2025-04-14 18:30,Bahia,Athletico-PR,1,2,FINISHED,Bruno Arleu,1.35,1.55,11,13,4,5,2,2
+6,2,2025-04-20 16:00,Palmeiras,São Paulo,3,1,FINISHED,Wilton Sampaio,2.25,1.10,16,9,8,4,2,3
+7,2,2025-04-20 18:30,Corinthians,Flamengo,0,2,FINISHED,Anderson Daronco,0.85,1.95,7,15,3,7,4,2
+8,2,2025-04-20 19:00,Internacional,Botafogo,1,1,FINISHED,Raphael Claus,1.40,1.35,12,11,6,5,3,3
+9,2,2025-04-21 16:00,Grêmio,Atlético-MG,2,2,FINISHED,Bruno Arleu,1.75,1.70,14,13,5,6,3,4
+10,2,2025-04-21 18:30,Athletico-PR,Bahia,1,0,FINISHED,Rafael Traci,1.25,0.90,10,8,4,3,2,1
+11,3,2025-04-27 16:00,Flamengo,Internacional,3,0,FINISHED,Wilton Sampaio,2.45,0.75,19,6,9,2,1,2
+12,3,2025-04-27 18:30,São Paulo,Botafogo,2,1,FINISHED,Anderson Daronco,1.85,1.20,14,10,6,4,2,3
+13,3,2025-04-27 19:00,Atlético-MG,Athletico-PR,1,1,FINISHED,Raphael Claus,1.55,1.50,13,12,5,5,3,2
+14,3,2025-04-28 16:00,Palmeiras,Grêmio,4,1,FINISHED,Bruno Arleu,2.95,1.05,20,9,10,3,2,2
+15,3,2025-04-28 18:30,Corinthians,Bahia,2,0,FINISHED,Rafael Traci,1.65,0.85,12,7,5,3,3,1
+16,31,2025-11-02 16:00,Flamengo,Botafogo,,,SCHEDULED,,,,,,,,,
+17,31,2025-11-02 18:30,Palmeiras,Corinthians,,,SCHEDULED,,,,,,,,,
+18,31,2025-11-02 19:00,São Paulo,Internacional,,,SCHEDULED,,,,,,,,,
+19,31,2025-11-03 16:00,Atlético-MG,Grêmio,,,SCHEDULED,,,,,,,,,
+20,31,2025-11-03 18:30,Bahia,Athletico-PR,,,SCHEDULED,,,,,,,,,
