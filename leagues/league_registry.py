@@ -2,6 +2,7 @@
 League registry for managing available leagues
 """
 from leagues.brasileirao import BrasileiraoSerieA
+from leagues.premier_league import PremierLeague
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -13,6 +14,7 @@ class LeagueRegistry:
     
     _leagues = {
         'brasileirao': BrasileiraoSerieA,
+        'premier_league': PremierLeague,
     }
     
     @classmethod
