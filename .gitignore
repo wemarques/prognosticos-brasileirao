@@ -7,3 +7,6 @@ data/cache/
 *.db
 .vscode/
 *.log
+# AWS SSH Keys
+*.pem
+aws_key.pem
