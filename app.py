@@ -324,38 +324,40 @@ if modo == "🎯 Jogo Específico (Time vs Time)":
 
 else:
     st.subheader(f"📋 Todos os Jogos da Rodada {rodada}")
-    
-    if fixtures_collector:
-        fixtures = fixtures_collector.get_fixtures_by_round(rodada)
-        
-        if fixtures:
-            st.info(f"📅 {len(fixtures)} jogos encontrados na rodada {rodada}")
-            
-            for fixture in fixtures:
-                with st.expander(f"⚽ {fixture['home_team']} vs {fixture['away_team']}"):
-                    st.write(f"**Data:** {fixture['date']}")
-                    st.write(f"**Status:** {fixture['status']}")
-                    
-                    if st.button(f"🔮 Gerar Prognóstico", key=f"prog_{fixture['home_team_id']}_{fixture['away_team_id']}"):
-                        st.info("🚧 Funcionalidade de prognóstico em desenvolvimento...")
-                        
-                        probabilities = {
-                            'goals': {
-                                'over_2.5': 45.0,
-                                'under_2.5': 55.0
-                            }
+
+    # Buscar jogos do CSV usando HybridDataCollector
+    fixtures = collector.get_matches(round_number=rodada)
+
+    if fixtures:
+        st.info(f"📅 {len(fixtures)} jogos encontrados na rodada {rodada}")
+
+        for idx, fixture in enumerate(fixtures):
+            with st.expander(f"⚽ {fixture['home_team']} vs {fixture['away_team']}"):
+                st.write(f"**Data:** {fixture['date']}")
+                st.write(f"**Status:** {fixture['status']}")
+
+                if fixture.get('home_score') is not None and fixture.get('away_score') is not None:
+                    st.write(f"**Placar:** {fixture['home_score']} x {fixture['away_score']}")
+
+                if st.button(f"🔮 Gerar Prognóstico", key=f"prog_{fixture['id']}_{idx}"):
+                    st.info("🚧 Funcionalidade de prognóstico em desenvolvimento...")
+
+                    probabilities = {
+                        'goals': {
+                            'over_2.5': 45.0,
+                            'under_2.5': 55.0
                         }
-                        
-                        st.markdown("---")
-                        st.subheader("💰 Gestão de Banca")
-                        display_stake_calculation(probabilities, bankroll, kelly_fraction)
-                        
-                        st.markdown("---")
-                        display_roi_simulation(bankroll, kelly_fraction)
-        else:
-            st.warning(f"⚠️ Nenhum jogo encontrado para a rodada {rodada}")
+                    }
+
+                    st.markdown("---")
+                    st.subheader("💰 Gestão de Banca")
+                    display_stake_calculation(probabilities, bankroll, kelly_fraction)
+
+                    st.markdown("---")
+                    display_roi_simulation(bankroll, kelly_fraction)
     else:
-        st.info("📊 Modo de análise por rodada disponível apenas para Brasileirão")
+        st.warning(f"⚠️ Nenhum jogo encontrado para a rodada {rodada}")
+        st.info(f"💡 Dica: O CSV atual tem dados para as rodadas 1, 2, 3 e 31")
 
 st.markdown("---")
 
