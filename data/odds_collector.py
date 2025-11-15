@@ -14,8 +14,8 @@ load_dotenv()
 class OddsCollector:
     """Coleta odds reais de casas de apostas"""
     
-    def __init__(self):
-        self.api_key = os.getenv("ODDS_API_KEY")
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv("ODDS_API_KEY")
         self.base_url = "https://api.the-odds-api.com/v4"
         self.sport_key = "soccer_brazil_campeonato"  # Brasileirão
         self.regions = "us,uk,eu"  # Múltiplas regiões

@@ -157,7 +157,7 @@ class HybridDataCollector:
                 logger.warning(f"Sport key não mapeado para liga: {self.league_key}")
                 return matches
 
-            odds_data = self.odds_collector.get_odds(odds_sport_key)
+            odds_data = self.odds_collector.get_upcoming_matches()
 
             # Mapear odds por combinação de times
             odds_map = {}

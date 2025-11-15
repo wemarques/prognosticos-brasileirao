@@ -1,6 +1,7 @@
 """
 League registry for managing available leagues
 """
+from leagues.base_league import BaseLeague
 from leagues.brasileirao import BrasileiraoSerieA
 from utils.logger import setup_logger
 

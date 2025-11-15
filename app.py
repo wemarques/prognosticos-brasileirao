@@ -12,22 +12,6 @@ from models.dixon_coles import DixonColesModel
 
 st.set_page_config(page_title="Prognósticos de Futebol", layout="wide")
 
-st.sidebar.header("⚙️ Configurações")
-
-available_leagues = LeagueRegistry.get_available_leagues()
-selected_league_key = st.sidebar.selectbox(
-    "Liga:",
-    options=list(available_leagues.keys()),
-    format_func=lambda x: available_leagues[x]
-)
-
-try:
-    model = DixonColesModel(selected_league_key)
-    st.sidebar.success(f"✅ {model.league.name} carregado")
-except Exception as e:
-    st.sidebar.error(f"❌ Erro ao carregar liga: {e}")
-    st.stop()
-
 def display_stake_calculation(probabilities, bankroll, kelly_fraction):
     """Display Kelly Criterion stake calculation for Over 2.5 goals"""
     if probabilities and 'goals' in probabilities and 'over_2.5' in probabilities['goals']:
@@ -140,6 +124,13 @@ league_info = get_league_info(selected_league)
 
 # Exibir informações da liga
 st.title(f"{league_info['icon']} {league_info['name']}")
+
+# Inicializar modelo Dixon-Coles
+try:
+    model = DixonColesModel(selected_league)
+except Exception as e:
+    st.sidebar.error(f"❌ Erro ao carregar liga: {e}")
+    st.stop()
 
 # Criar collector híbrido (CSV + Odds API)
 odds_api_key = os.getenv('ODDS_API_KEY')
