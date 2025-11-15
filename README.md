@@ -1,18 +1,24 @@
-# Sistema de Prognósticos - Brasileirão
+# Sistema de Prognósticos - Multi-Ligas
 
-Sistema automatizado de análise e prognósticos para o Campeonato Brasileiro Série A.
+Sistema automatizado de análise e prognósticos para futebol.
+
+## Ligas Suportadas
+- 🇧🇷 Brasileirão Série A
+- 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League (Inglaterra)
 
 ## Tecnologias
 - Python 3.9+
 - Streamlit
-- APIs: API-Football, The-Odds-API
+- Dados: Arquivos CSV locais
+- Odds: The Odds API (tempo real)
 
 ## Funcionalidades
-- Coleta automática de dados via APIs
+- Leitura de dados de arquivos CSV (rápido e sem limites de API)
 - Modelos estatísticos (Dixon-Coles, Monte Carlo)
-- Calibrações específicas para o Brasileirão
+- Calibrações específicas por liga
 - Interface visual intuitiva
 - Detecção automática de value bets
+- Odds em tempo real via The Odds API
 
 ## Instalação e Configuração
 
@@ -22,28 +28,28 @@ Sistema automatizado de análise e prognósticos para o Campeonato Brasileiro S�
 pip install -r requirements.txt
 ```
 
-### 2. Configuração de Variáveis de Ambiente
+### 2. Copiar Arquivos CSV
 
-Copie o arquivo de exemplo e configure suas API keys:
+**IMPORTANTE**: O sistema usa arquivos CSV locais para dados de jogos e times.
 
-```bash
-cp .env.example .env
-```
+Siga as instruções em `SETUP_CSV_FILES.md` para copiar os arquivos CSV necessários para as pastas corretas.
 
-Edite o arquivo `.env` e adicione suas chaves de API:
+### 3. Configuração de Variáveis de Ambiente (Opcional)
+
+O arquivo `.env` já foi criado. Se você quiser odds em tempo real, edite-o e adicione sua chave da The Odds API:
 
 ```env
-# API-Football (obtenha em: https://www.api-football.com/)
-API_FOOTBALL_KEY=sua_chave_aqui
-
-# Odds API (opcional - obtenha em: https://the-odds-api.com/)
+# ODDS API (para buscar odds em tempo real das casas de apostas)
+# Obtenha sua chave em: https://the-odds-api.com/
 ODDS_API_KEY=sua_chave_aqui
 
 # Logging configuration
 LOG_LEVEL=INFO
 ```
 
-### 3. Executar o Sistema
+**Nota**: O sistema funciona SEM a Odds API (usará apenas dados dos CSVs).
+
+### 4. Executar o Sistema
 
 ```bash
 streamlit run app.py
@@ -61,10 +67,24 @@ O sistema abrirá automaticamente no seu navegador em `http://localhost:8501`
 
 ## Estrutura de Dados
 
-O sistema usa uma arquitetura híbrida:
-- **CSV**: Dados históricos e cadastrais (gratuito, rápido)
-- **API**: Odds em tempo real (quando configurado)
+O sistema usa arquivos CSV locais:
+- **CSV**: Todos os dados de jogos, times e classificações
+- **The Odds API**: Apenas para odds em tempo real (opcional)
 
-Os arquivos CSV ficam em `data/csv/{liga}/` e são atualizados periodicamente.
+### Arquivos CSV Necessários
+
+```
+data/csv/
+├── brasileirao/
+│   ├── 2025_matches.csv
+│   ├── 2025_teams.csv
+│   └── 2025_standings.csv (opcional)
+└── premier_league/
+    ├── 2025_matches.csv
+    ├── 2025_teams.csv
+    └── 2025_standings.csv (opcional)
+```
+
+Consulte `SETUP_CSV_FILES.md` para instruções detalhadas.
 
 ⚠️ **Aviso:** Use com responsabilidade. Aposte apenas o que pode perder.

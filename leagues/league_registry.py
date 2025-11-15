@@ -3,6 +3,7 @@ League registry for managing available leagues
 """
 from leagues.base_league import BaseLeague
 from leagues.brasileirao import BrasileiraoSerieA
+from leagues.premier_league import PremierLeague
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -11,9 +12,10 @@ class LeagueRegistry:
     """
     Registry of available leagues.
     """
-    
+
     _leagues = {
         'brasileirao': BrasileiraoSerieA,
+        'premier_league': PremierLeague,
     }
     
     @classmethod

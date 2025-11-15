@@ -1,50 +1,41 @@
 """
-Teams Collector - Busca lista de times de uma liga
-Atualizado com Prompt 0.1-0.2: Lista oficial 2025
+Teams Collector - Busca lista de times de uma liga dos arquivos CSV
 """
-import os
-import requests
+import pandas as pd
+from pathlib import Path
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-def get_teams_list(league_id=2013, season=2025):
+def get_teams_list(league_key='brasileirao', season=2025):
     """
-    Get list of teams in a league from API.
-    
+    Get list of teams in a league from CSV file.
+
     Args:
-        league_id: Football-Data.org league ID (2013 = Brasileirão Série A)
+        league_key: League identifier ('brasileirao', 'premier_league')
         season: Season year (default: 2025)
-    
+
     Returns:
-        list: List of team names (official names from API)
+        list: List of team names
     """
-    api_key = os.getenv('FOOTBALL_DATA_API_KEY')
-    
+    csv_path = Path(__file__).parent.parent / 'data' / 'csv' / league_key
+    teams_file = csv_path / f'{season}_teams.csv'
+
     try:
-        headers = {'X-Auth-Token': api_key}
-        url = f"https://api.football-data.org/v4/competitions/{league_id}/teams"
-        params = {'season': season}
-        
-        response = requests.get(url, headers=headers, params=params, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        teams = [team['name'] for team in data.get('teams', [])]
-        
-        logger.info(f"✅ Found {len(teams)} teams in Brasileirão Série A {season}")
-        
-        # Validação
-        if len(teams) == 20:
-            logger.info("✅ Complete list: 20 teams")
-        else:
-            logger.warning(f"⚠️ Incomplete list: {len(teams)}/20 teams")
-        
+        if not teams_file.exists():
+            logger.warning(f"⚠️ Teams file not found: {teams_file}. Using fallback.")
+            return get_fallback_teams_2025() if league_key == 'brasileirao' else []
+
+        df = pd.read_csv(teams_file)
+        teams = df['name'].tolist()
+
+        logger.info(f"✅ Found {len(teams)} teams in {league_key} {season}")
+
         return sorted(teams)
-        
+
     except Exception as e:
-        logger.error(f"❌ Error fetching teams from API: {e}. Using fallback.")
-        return get_fallback_teams_2025()
+        logger.error(f"❌ Error reading teams from CSV: {e}. Using fallback.")
+        return get_fallback_teams_2025() if league_key == 'brasileirao' else []
 
 def get_fallback_teams_2025():
     """

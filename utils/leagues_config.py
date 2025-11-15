@@ -13,11 +13,9 @@ LEAGUES = {
         'season': 2025,
         'icon': '🇧🇷',
         'api': {
-            'provider': 'football_data',
-            'league_id': 2013,
-            'league_code': 'BSA',  # Código correto para API v4
-            'api_key': os.getenv('FOOTBALL_DATA_API_KEY'),
-            'base_url': 'https://api.football-data.org/v4'
+            'provider': 'csv',  # Dados vêm de CSV local
+            'odds_api_key': os.getenv('ODDS_API_KEY'),  # Apenas para odds
+            'odds_sport_key': 'soccer_brazil_campeonato'
         },
         'stats': {
             'league_avg_goals': 1.82,
@@ -41,11 +39,9 @@ LEAGUES = {
         'season': 2024,  # 2024/25
         'icon': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
         'api': {
-            'provider': 'football_data',
-            'league_id': 2021,
-            'league_code': 'PL',  # Código correto para API v4
-            'api_key': os.getenv('FOOTBALL_DATA_API_KEY'),
-            'base_url': 'https://api.football-data.org/v4'
+            'provider': 'csv',  # Dados vêm de CSV local
+            'odds_api_key': os.getenv('ODDS_API_KEY'),  # Apenas para odds
+            'odds_sport_key': 'soccer_epl'
         },
         'stats': {
             'league_avg_goals': 2.69,

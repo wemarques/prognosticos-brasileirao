@@ -136,10 +136,8 @@ except Exception as e:
 odds_api_key = os.getenv('ODDS_API_KEY')
 collector = HybridDataCollector(league_key=selected_league, odds_api_key=odds_api_key)
 
-if selected_league == 'brasileirao':
-    fixtures_collector = FixturesCollector(league_id=2013)
-else:
-    fixtures_collector = None
+# Fixtures collector para ambas as ligas (agora usa CSV)
+fixtures_collector = FixturesCollector(league_key=selected_league)
 
 st.sidebar.header("⚙️ Configurações")
 
@@ -216,12 +214,9 @@ if st.session_state.last_rodada != rodada:
 
 if modo == "🎯 Jogo Específico (Time vs Time)":
     st.subheader(f"🎯 Análise de Jogo Específico - Rodada {rodada}")
-    
-    if selected_league == 'brasileirao':
-        teams_list = get_teams_list(league_id=2013)
-    else:
-        teams = collector.get_teams()
-        teams_list = [team['name'] for team in teams] if teams else []
+
+    # Buscar lista de times usando o collector (CSV)
+    teams_list = get_teams_list(league_key=selected_league)
     
     col1, col2 = st.columns(2)
     
