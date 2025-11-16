@@ -1,0 +1,95 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+      - claude/fix-system-errors-01AK1ZbdXd1Pvipn2yyzNNcN
+      - claude/frontend-review-improvements-01SLDqfrpQJaeBCaHmyLkkcU
+  workflow_dispatch:  # Permite executar manualmente
+
+env:
+  AWS_REGION: us-east-1
+  EC2_HOST: ${{ secrets.EC2_HOST }}
+  EC2_USER: ubuntu
+  EC2_KEY: ${{ secrets.EC2_SSH_KEY }}
+  DEPLOY_PATH: /home/ubuntu/prognosticos-brasileirao
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Test SSH Connection
+        run: |
+          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST 'echo "SSH connection successful"'
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST << 'EOF'
+            set -e
+
+            echo "📦 Navigating to application directory..."
+            cd ${{ env.DEPLOY_PATH }}
+
+            echo "🔄 Pulling latest changes..."
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+
+            echo "🛑 Stopping containers..."
+            docker-compose down
+
+            echo "🏗️ Building new images..."
+            docker-compose build --no-cache
+
+            echo "🚀 Starting containers..."
+            docker-compose up -d
+
+            echo "⏳ Waiting for application to start..."
+            sleep 10
+
+            echo "✅ Checking container status..."
+            docker-compose ps
+
+            echo "📊 Showing recent logs..."
+            docker-compose logs --tail=50 app
+
+            echo "✅ Deploy completed successfully!"
+          EOF
+
+      - name: Health Check
+        run: |
+          sleep 5
+          curl -f http://${{ secrets.EC2_HOST }}:8501/_stcore/health || exit 1
+          echo "✅ Application is healthy!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Deploy successful for branch ${{ github.ref_name }}"
+          echo "🌐 Application URL: http://${{ secrets.EC2_HOST }}:8501"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deploy failed for branch ${{ github.ref_name }}"
+          echo "📝 Check logs for details"
