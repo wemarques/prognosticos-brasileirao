@@ -201,6 +201,12 @@ class HybridDataCollector:
         try:
             df = pd.read_csv(teams_file)
             teams = df.to_dict('records')
+
+            # Normalize team_name to name for API compatibility
+            for team in teams:
+                if 'team_name' in team and 'name' not in team:
+                    team['name'] = team['team_name']
+
             logger.info(f"Carregados {len(teams)} times do CSV")
             return teams
         except Exception as e:
