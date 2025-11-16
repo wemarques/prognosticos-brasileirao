@@ -55,18 +55,18 @@ class FixturesCollector:
 
             df = pd.read_csv(matches_file)
 
-            # Filtrar por rodada
-            round_matches = df[df['round'] == round_number]
+            # Filtrar por rodada (coluna "Game Week" no CSV do FootyStats)
+            round_matches = df[df['Game Week'] == round_number]
 
             fixtures = []
             for _, match in round_matches.iterrows():
                 fixture = {
-                    'home_team': match['home_team'],
-                    'home_team_id': match.get('id', match.get('home_team_id', 0)),
-                    'away_team': match['away_team'],
-                    'away_team_id': match.get('id', match.get('away_team_id', 0)),
+                    'home_team': match['home_team_name'],
+                    'home_team_id': match.get('id', 0),
+                    'away_team': match['away_team_name'],
+                    'away_team_id': match.get('id', 0),
                     'round': round_number,
-                    'date': match.get('date', ''),
+                    'date': match.get('date_GMT', ''),
                     'status': match.get('status', 'SCHEDULED')
                 }
                 fixtures.append(fixture)
