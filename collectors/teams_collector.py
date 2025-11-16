@@ -27,7 +27,7 @@ def get_teams_list(league_key='brasileirao', season=2025):
             return get_fallback_teams_2025() if league_key == 'brasileirao' else []
 
         df = pd.read_csv(teams_file)
-        teams = df['name'].tolist()
+        teams = df['team_name'].tolist()
 
         logger.info(f"✅ Found {len(teams)} teams in {league_key} {season}")
 

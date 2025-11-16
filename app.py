@@ -359,6 +359,6 @@ st.subheader("Times")
 teams = collector.get_teams()
 if teams:
     for team in teams[:5]:
-        st.write(f"- {team['name']}")
+        st.write(f"- {team['team_name']}")
 else:
     st.warning("Nenhum time encontrado")
