@@ -12,6 +12,134 @@ from models.dixon_coles import DixonColesModel
 from analysis.premier_league_data_pipeline import load_premier_round_matches
 from analysis.prediction import run_prediction, format_report
 
+st.set_page_config(
+    page_title="Prognósticos – Premier League & Brasileirão",
+    page_icon="⚽",
+    layout="wide",
+)
+
+THEME = {
+    "bg_page": "#020617",
+    "bg_card": "#0b1120",
+    "bg_card_soft": "#020617",
+    "border_soft": "#1f2937",
+    "primary": "#38bdf8",
+    "success": "#22c55e",
+    "danger": "#f97316",
+    "text_main": "#e5e7eb",
+    "text_muted": "#9ca3af",
+    "accent": "#facc15",
+}
+
+st.markdown(
+    f"""
+    <style>
+    body {{
+        background: {THEME["bg_page"]};
+    }}
+
+    .match-card {{
+        background: linear-gradient(135deg, {THEME["bg_card"]}, {THEME["bg_card_soft"]});
+        border-radius: 18px;
+        border: 1px solid {THEME["border_soft"]};
+        padding: 1.1rem 1.3rem;
+        margin-bottom: 0.8rem;
+        box-shadow: 0 18px 35px rgba(0,0,0,0.45);
+    }}
+
+    .match-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.7rem;
+    }}
+
+    .match-title {{
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: {THEME["text_main"]};
+    }}
+
+    .match-subtitle {{
+        font-size: 0.78rem;
+        color: {THEME["text_muted"]};
+    }}
+
+    .badge-trend {{
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }}
+
+    .badge-green {{
+        background: rgba(34,197,94,0.16);
+        color: {THEME["success"]};
+    }}
+
+    .badge-red {{
+        background: rgba(239,68,68,0.16);
+        color: #f97373;
+    }}
+
+    .badge-blue {{
+        background: rgba(56,189,248,0.16);
+        color: {THEME["primary"]};
+    }}
+
+    .pill-metric {{
+        font-size: 0.76rem;
+        color: {THEME["text_muted"]};
+        margin-bottom: 0.15rem;
+    }}
+
+    .pill-metric strong {{
+        color: {THEME["text_main"]};
+    }}
+
+    .metric-label {{
+        font-size: 0.7rem;
+        color: {THEME["text_muted"]};
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }}
+
+    .metric-value {{
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: {THEME["text_main"]};
+    }}
+
+    .ev-positive {{
+        color: {THEME["success"]};
+        font-weight: 600;
+    }}
+
+    .ev-negative {{
+        color: {THEME["danger"]};
+        font-weight: 500;
+    }}
+
+    .section-title {{
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: {THEME["text_main"]};
+        margin: 0.4rem 0 0.3rem 0;
+    }}
+
+    .section-sub {{
+        font-size: 0.8rem;
+        color: {THEME["text_muted"]};
+        margin-bottom: 0.6rem;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 @st.cache_data(show_spinner="Carregando rodada da Premier League...")
 def cached_load_premier_round_matches(round_number: int):
@@ -21,12 +149,6 @@ def cached_load_premier_round_matches(round_number: int):
 @st.cache_data(show_spinner="Executando simulações de partida...")
 def cached_run_prediction(match, n_sim: int):
     return run_prediction(match, n_sim=n_sim)
-
-st.set_page_config(
-    page_title="Prognósticos – Premier League & Brasileirão",
-    page_icon="⚽",
-    layout="wide"
-)
 
 st.sidebar.header("⚙️ Configurações")
 
