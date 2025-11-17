@@ -163,15 +163,24 @@ class FootballDataCollectorV2:
         normalized = []
         for match in matches:
             try:
+                referees = match.get('referees') or []
+                primary_referee = referees[0].get('name') if referees else None
                 normalized.append({
                     'id': match.get('id'),
                     'date': match.get('utcDate'),
+                    'kickoff_utc': match.get('utcDate'),
+                    'round': match.get('matchday'),
+                    'stage': match.get('stage'),
                     'home_team': match.get('homeTeam', {}).get('name'),
+                    'home_team_id': match.get('homeTeam', {}).get('id'),
                     'away_team': match.get('awayTeam', {}).get('name'),
+                    'away_team_id': match.get('awayTeam', {}).get('id'),
                     'home_goals': match.get('score', {}).get('fullTime', {}).get('home'),
                     'away_goals': match.get('score', {}).get('fullTime', {}).get('away'),
                     'status': match.get('status'),
                     'competition': match.get('competition', {}).get('name'),
+                    'referee': primary_referee,
+                    'last_updated': match.get('lastUpdated'),
                 })
             except Exception as e:
                 logger.warning(f"Erro ao normalizar match: {e}")

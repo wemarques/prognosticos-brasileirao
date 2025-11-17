@@ -484,6 +484,11 @@ def _parse_brasileirao_datetime(label: str):
     cleaned = str(label).strip()
     if not cleaned:
         return None
+    iso_candidate = cleaned.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(iso_candidate)
+    except ValueError:
+        pass
     for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
         try:
             return datetime.strptime(cleaned, fmt)
@@ -494,16 +499,26 @@ def _parse_brasileirao_datetime(label: str):
 
 def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
     """
-    Minimal Brasileirão loader that maps the static CSV into MatchInputs objects.
-    Assumes the CSV lives under data/csv/brasileirao/2025_matches.csv and uses
-    the columns exposed in that file (date, home_team, away_team, *_xg, *_cards, *_corners).
+    Carrega partidas do Brasileirão a partir de data/csv/brasileirao/2025_matches.csv.
+
+    O CSV é gerado por scripts/update_csv_from_api.py e contém as colunas:
+        round, home_team, away_team, kickoff_utc, lambda_home, lambda_away,
+        mean_cards, mean_corners, além de metadados opcionais.
+
+    Para manter compatibilidade com versões antigas, o loader também aceita
+    colunas legadas (home_xg, home_cards etc).
     """
     if not BR_MATCHES_CSV.exists():
         raise FileNotFoundError(f"Brasileirão matches CSV não encontrado: {BR_MATCHES_CSV}")
 
     df = pd.read_csv(BR_MATCHES_CSV)
     df["round"] = pd.to_numeric(df.get("round"), errors="coerce")
-    round_df = df[df["round"] == int(round_number)]
+    legacy_round = pd.to_numeric(df.get("round_number"), errors="coerce")
+    if legacy_round.notna().any():
+        df["round"] = df["round"].fillna(legacy_round)
+
+    target_round = int(round_number)
+    round_df = df[df["round"] == target_round]
 
     match_inputs: list[MatchInputs] = []
     for _, row in round_df.iterrows():
@@ -512,41 +527,60 @@ def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
         if not home_team or not away_team:
             continue
 
-        home_xg = _to_float(row.get("home_xg"))
-        away_xg = _to_float(row.get("away_xg"))
-        lambda_home = home_xg or DEFAULT_BR_HOME_LAMBDA
-        lambda_away = away_xg or DEFAULT_BR_AWAY_LAMBDA
+        lambda_home = (
+            _to_float(row.get("lambda_home"))
+            or _to_float(row.get("home_xg"))
+            or DEFAULT_BR_HOME_LAMBDA
+        )
+        lambda_away = (
+            _to_float(row.get("lambda_away"))
+            or _to_float(row.get("away_xg"))
+            or DEFAULT_BR_AWAY_LAMBDA
+        )
 
-        home_cards = _to_float(row.get("home_cards"))
-        away_cards = _to_float(row.get("away_cards"))
-        mean_cards = _mean_or_default([home_cards, away_cards], DEFAULT_BR_CARDS)
+        mean_cards = (
+            _to_float(row.get("mean_cards"))
+            or _mean_or_default(
+                [_to_float(row.get("home_cards")), _to_float(row.get("away_cards"))],
+                DEFAULT_BR_CARDS,
+            )
+        )
+        mean_corners = (
+            _to_float(row.get("mean_corners"))
+            or _mean_or_default(
+                [_to_float(row.get("home_corners")), _to_float(row.get("away_corners"))],
+                DEFAULT_BR_CORNERS,
+            )
+        )
 
-        home_corners = _to_float(row.get("home_corners"))
-        away_corners = _to_float(row.get("away_corners"))
-        mean_corners = _mean_or_default([home_corners, away_corners], DEFAULT_BR_CORNERS)
-
-        kickoff_label = str(row.get("date", "") or "").strip()
-        kickoff_dt = _parse_brasileirao_datetime(kickoff_label)
-        kickoff_value = kickoff_dt if isinstance(kickoff_dt, datetime) else kickoff_label
+        kickoff_source = row.get("kickoff_utc") or row.get("kickoff") or row.get("date")
+        kickoff_dt = _parse_brasileirao_datetime(kickoff_source)
+        kickoff_value = kickoff_dt if isinstance(kickoff_dt, datetime) else kickoff_source
+        if isinstance(kickoff_value, datetime):
+            kickoff_label = kickoff_value.strftime("%d %b %Y %H:%M (UTC)")
+        else:
+            kickoff_label = str(kickoff_value or "")
 
         context = {
-            "round": int(round_number),
+            "round": target_round,
             "status": row.get("status", "SCHEDULED"),
             "league": "Brasileirão Série A",
             "kickoff_label": kickoff_label,
-            "referee": row.get("referee"),
-            "lambda_cards_home": max(home_cards or mean_cards * 0.55, 1.0),
-            "lambda_cards_away": max(away_cards or mean_cards * 0.45, 0.8),
+            "lambda_cards_home": max(mean_cards * 0.55, 1.0),
+            "lambda_cards_away": max(mean_cards * 0.45, 0.8),
             "lambda_corners": mean_corners,
-            "odds": {},  # Brasileirão CSV ainda não fornece odds pré-jogo.
-            "fixture_metadata": {"match_id": row.get("id")},
+            "odds": row.get("odds") or {},
+            "fixture_metadata": {
+                "match_id": row.get("match_id") or row.get("id"),
+                "raw_stage": row.get("stage"),
+            },
         }
 
         match_inputs.append(
             MatchInputs(
                 home_team=home_team,
                 away_team=away_team,
-                round_number=int(round_number),
+                round_number=target_round,
                 kickoff_utc=kickoff_value,
                 lambda_home=lambda_home,
                 lambda_away=lambda_away,
