@@ -202,6 +202,90 @@ if selected_league == 'premier_league':
 
                 try:
                     result = cached_run_prediction(match, n_sim=n_sim)
+                    p_home = result["p_home_win"]
+                    p_draw = result["p_draw"]
+                    p_away = result["p_away_win"]
+
+                    odds_defaults = context.get("odds") or {}
+
+                    def normalize_default(value: float | None) -> float:
+                        if value is None or value < 1.01:
+                            return 1.01
+                        return float(value)
+
+                    default_home = normalize_default(odds_defaults.get("home"))
+                    default_draw = normalize_default(odds_defaults.get("draw"))
+                    default_away = normalize_default(odds_defaults.get("away"))
+
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        odd_home = st.number_input(
+                            "Odd Mandante",
+                            value=default_home,
+                            min_value=1.01,
+                            step=0.01,
+                            key=f"odd_home_{selected_round}_{idx}"
+                        )
+                        ev_home = p_home * odd_home - 1
+                        if ev_home > 0:
+                            st.success(f"EV: {ev_home:+.2f}")
+                        else:
+                            st.warning(f"EV: {ev_home:+.2f}")
+                        stake_home = 0.0
+                        if ev_home > 0 and odd_home > 1:
+                            stake_home = max(bankroll * (ev_home / (odd_home - 1)) * kelly_fraction, 0.0)
+                        st.caption(f"Stake sugerida: R$ {stake_home:.2f}")
+
+                    with col2:
+                        odd_draw = st.number_input(
+                            "Odd Empate",
+                            value=default_draw,
+                            min_value=1.01,
+                            step=0.01,
+                            key=f"odd_draw_{selected_round}_{idx}"
+                        )
+                        ev_draw = p_draw * odd_draw - 1
+                        if ev_draw > 0:
+                            st.success(f"EV: {ev_draw:+.2f}")
+                        else:
+                            st.warning(f"EV: {ev_draw:+.2f}")
+                        stake_draw = 0.0
+                        if ev_draw > 0 and odd_draw > 1:
+                            stake_draw = max(bankroll * (ev_draw / (odd_draw - 1)) * kelly_fraction, 0.0)
+                        st.caption(f"Stake sugerida: R$ {stake_draw:.2f}")
+
+                    with col3:
+                        odd_away = st.number_input(
+                            "Odd Visitante",
+                            value=default_away,
+                            min_value=1.01,
+                            step=0.01,
+                            key=f"odd_away_{selected_round}_{idx}"
+                        )
+                        ev_away = p_away * odd_away - 1
+                        if ev_away > 0:
+                            st.success(f"EV: {ev_away:+.2f}")
+                        else:
+                            st.warning(f"EV: {ev_away:+.2f}")
+                        stake_away = 0.0
+                        if ev_away > 0 and odd_away > 1:
+                            stake_away = max(bankroll * (ev_away / (odd_away - 1)) * kelly_fraction, 0.0)
+                        st.caption(f"Stake sugerida: R$ {stake_away:.2f}")
+
+                    fair_home = 1 / p_home if p_home > 0 else None
+                    fair_draw = 1 / p_draw if p_draw > 0 else None
+                    fair_away = 1 / p_away if p_away > 0 else None
+
+                    st.markdown("**Odds Justas**")
+                    fair_col1, fair_col2, fair_col3 = st.columns(3)
+                    with fair_col1:
+                        st.metric("Mandante", f"{fair_home:.2f}" if fair_home else "—")
+                    with fair_col2:
+                        st.metric("Empate", f"{fair_draw:.2f}" if fair_draw else "—")
+                    with fair_col3:
+                        st.metric("Visitante", f"{fair_away:.2f}" if fair_away else "—")
+
                     report = format_report(match, result)
                     st.text(report)
                 except Exception as prediction_error:
