@@ -393,7 +393,7 @@ def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> N
     with st.expander("🔍 Análise detalhada & mercados auxiliares"):
         try:
             report_text = format_report(match, result)
-            st.markdown(f"```\n{report_text}\n```")
+            st.markdown(report_text)
         except Exception:
             st.write(
                 "Não foi possível gerar o relatório detalhado para esta partida."
@@ -565,6 +565,11 @@ if selected_league == 'premier_league':
         st.error(f"❌ Erro ao carregar rodada: {pipeline_error}")
         matches = []
 
+    total_matches = 0
+    total_value_bets = 0
+    total_stake_suggested = 0.0
+    ev_values_for_avg: list[float] = []
+
     if matches:
         def normalize_default(value: float | None) -> float:
             if value is None or value < 1.01:
@@ -631,22 +636,25 @@ if selected_league == 'premier_league':
                             return None
                         return prob * odd_value - 1
 
-                    def compute_kelly_fraction(prob: float, odd_value: float) -> float:
+                    def compute_kelly_raw(prob: float, odd_value: float) -> float | None:
                         if odd_value <= 1:
-                            return 0.0
+                            return None
                         edge_val = prob * odd_value - 1
                         if edge_val <= 0:
-                            return 0.0
-                        base_fraction = edge_val / (odd_value - 1)
-                        return max(base_fraction * kelly_fraction, 0.0)
+                            return None
+                        return edge_val / (odd_value - 1)
 
                     ev_home = compute_ev(p_home, odd_home)
                     ev_draw = compute_ev(p_draw, odd_draw)
                     ev_away = compute_ev(p_away, odd_away)
 
-                    kelly_home_fraction = compute_kelly_fraction(p_home, odd_home)
-                    kelly_draw_fraction = compute_kelly_fraction(p_draw, odd_draw)
-                    kelly_away_fraction = compute_kelly_fraction(p_away, odd_away)
+                    kelly_home_raw = compute_kelly_raw(p_home, odd_home)
+                    kelly_draw_raw = compute_kelly_raw(p_draw, odd_draw)
+                    kelly_away_raw = compute_kelly_raw(p_away, odd_away)
+
+                    kelly_home_fraction = kelly_home_raw * kelly_fraction if kelly_home_raw is not None else None
+                    kelly_draw_fraction = kelly_draw_raw * kelly_fraction if kelly_draw_raw is not None else None
+                    kelly_away_fraction = kelly_away_raw * kelly_fraction if kelly_away_raw is not None else None
 
                     result["edge_home"] = ev_home * 100 if ev_home is not None else None
                     result["edge_draw"] = ev_draw * 100 if ev_draw is not None else None
@@ -671,11 +679,45 @@ if selected_league == 'premier_league':
                     setattr(match, "round_name", round_label)
                     setattr(match, "kickoff_str", kickoff_label)
 
+                    total_matches += 1
+                    for ev_percent, kelly_val in [
+                        (result.get("edge_home"), result.get("kelly_home")),
+                        (result.get("edge_draw"), result.get("kelly_draw")),
+                        (result.get("edge_away"), result.get("kelly_away")),
+                    ]:
+                        if (
+                            ev_percent is not None
+                            and kelly_val is not None
+                            and ev_percent > 0
+                            and kelly_val > 0
+                        ):
+                            total_value_bets += 1
+                            stake = bankroll * kelly_val
+                            total_stake_suggested += stake
+                            ev_values_for_avg.append(ev_percent)
+
                     render_match_card(match, result, odds_ctx, bankroll)
                 except Exception as prediction_error:
                     st.warning(f"⚠️ Não foi possível gerar o prognóstico: {prediction_error}")
     else:
         st.info("Nenhum jogo disponível para essa rodada.")
+
+    st.markdown('<div class="section-title">🎯 Resumo do dia – Premier League</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-sub">Visão geral dos jogos analisados, quantidade de value bets e distribuição de stakes.</div>',
+        unsafe_allow_html=True,
+    )
+    avg_ev = sum(ev_values_for_avg) / len(ev_values_for_avg) if ev_values_for_avg else 0.0
+
+    col_summary_a, col_summary_b, col_summary_c, col_summary_d = st.columns(4)
+    with col_summary_a:
+        st.metric("Jogos analisados", total_matches)
+    with col_summary_b:
+        st.metric("Value bets 1X2", total_value_bets)
+    with col_summary_c:
+        st.metric("Stake total sugerida", f"R$ {total_stake_suggested:.2f}")
+    with col_summary_d:
+        st.metric("EV médio (seleções positivas)", f"{avg_ev:.1f}%")
 
     st.markdown("---")
 
