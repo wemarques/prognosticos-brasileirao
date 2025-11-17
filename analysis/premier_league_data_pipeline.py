@@ -58,8 +58,6 @@ def load_premier_round_matches(round_id: int) -> List[MatchInputs]:
         home_stats = _build_team_stats(team_index.get(_normalize_team_name(home_team)), is_home=True)
         away_stats = _build_team_stats(team_index.get(_normalize_team_name(away_team)), is_home=False)
         context = _build_context(row)
-        context["home_stats"] = home_stats
-        context["away_stats"] = away_stats
 
         pre_match_home_xg = _optional_float(row.get("Home Team Pre-Match xG"))
         pre_match_away_xg = _optional_float(row.get("Away Team Pre-Match xG"))
@@ -79,6 +77,19 @@ def load_premier_round_matches(round_id: int) -> List[MatchInputs]:
 
         mean_cards = (context["lambda_cards_home"] + context["lambda_cards_away"]) / 2.0
         mean_corners = context["lambda_corners"]
+
+        context.update(
+            {
+                "team_stats": {
+                    "home": home_stats,
+                    "away": away_stats,
+                },
+                "expected_goals": {
+                    "model": {"home": lambda_home, "away": lambda_away},
+                    "pre_match": {"home": pre_match_home_xg, "away": pre_match_away_xg},
+                },
+            }
+        )
 
         match_inputs.append(
             MatchInputs(
@@ -199,23 +210,23 @@ def _build_team_stats(team_row: Optional[Dict[str, str]], is_home: bool) -> Dict
 def _build_context(row: Dict[str, Any]) -> Dict[str, Any]:
     avg_cards = _safe_float(row.get("average_cards_per_match_pre_match"), DEFAULT_CARDS_PER_MATCH)
     avg_corners = _safe_float(row.get("average_corners_per_match_pre_match"), DEFAULT_CORNERS_PER_MATCH)
+    home_pre_match_xg = _safe_float(row.get("Home Team Pre-Match xG"), DEFAULT_HOME_XG)
+    away_pre_match_xg = _safe_float(row.get("Away Team Pre-Match xG"), DEFAULT_AWAY_XG)
 
     def _odds(value: Any) -> Optional[float]:
         val = _safe_float(value, 0.0)
         return val if val > 0 else None
 
-    return {
+    context = {
         "round": int(_safe_float(row.get("Game Week"), 0)),
         "status": row.get("status", "SCHEDULED"),
         "venue": row.get("stadium_name") or row.get("home_team_name"),
-        "match_type": "normal",
+        "match_type": row.get("match_type", "normal"),
         "distance_km": 0.0,
         "altitude_m": 0.0,
         "lambda_cards_home": max(avg_cards * 0.55, 1.2),
         "lambda_cards_away": max(avg_cards * 0.45, 1.0),
         "lambda_corners": avg_corners,
-        "home_pre_match_xg": _safe_float(row.get("Home Team Pre-Match xG"), DEFAULT_HOME_XG),
-        "away_pre_match_xg": _safe_float(row.get("Away Team Pre-Match xG"), DEFAULT_AWAY_XG),
         "odds": {
             "home": _odds(row.get("odds_ft_home_team_win")),
             "draw": _odds(row.get("odds_ft_draw")),
@@ -226,7 +237,16 @@ def _build_context(row: Dict[str, Any]) -> Dict[str, Any]:
             "btts_no": _odds(row.get("odds_btts_no")),
         },
         "kickoff_label": row.get("date_GMT"),
+        "referee": _extract_referee(row),
+        "fixture_metadata": _build_fixture_metadata(row),
     }
+
+    context["pre_match_xg"] = {
+        "home": home_pre_match_xg,
+        "away": away_pre_match_xg,
+    }
+
+    return context
 
 
 def _parse_timestamp(timestamp_value: Any, fallback_label: Optional[str] = None) -> datetime:
@@ -302,3 +322,32 @@ def _estimate_lambda(
     if pre_match_xg is not None:
         base = (base * 0.7) + (pre_match_xg * 0.3)
     return max(0.2, base)
+
+
+def _extract_referee(row: Dict[str, Any]) -> Optional[str]:
+    for key in ("referee_name", "referee", "Referee"):
+        value = row.get(key)
+        if value:
+            return value
+    return None
+
+
+def _build_fixture_metadata(row: Dict[str, Any]) -> Dict[str, Any]:
+    candidate_keys = [
+        "fixture_id",
+        "match_id",
+        "season",
+        "competition",
+        "league_name",
+        "Game Week",
+        "stage",
+        "stadium_name",
+        "date_GMT",
+        "status",
+    ]
+    metadata: Dict[str, Any] = {}
+    for key in candidate_keys:
+        value = row.get(key)
+        if value not in (None, "", "N/A"):
+            metadata[key] = value
+    return metadata
