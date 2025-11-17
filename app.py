@@ -150,6 +150,254 @@ def cached_load_premier_round_matches(round_number: int):
 def cached_run_prediction(match, n_sim: int):
     return run_prediction(match, n_sim=n_sim)
 
+from typing import Literal
+
+Trend = Literal["home", "draw", "away"]
+
+
+def get_trend(p_home: float, p_draw: float, p_away: float) -> Trend:
+    probs = {"home": p_home, "draw": p_draw, "away": p_away}
+    return max(probs, key=probs.get)
+
+
+def render_trend_badge(p_home: float, p_draw: float, p_away: float) -> str:
+    trend = get_trend(p_home, p_draw, p_away)
+    if trend == "home":
+        label = "Tendência: Mandante"
+        cls = "badge-green"
+        icon = "🏠"
+    elif trend == "away":
+        label = "Tendência: Visitante"
+        cls = "badge-red"
+        icon = "✈️"
+    else:
+        label = "Tendência: Jogo Equilibrado"
+        cls = "badge-blue"
+        icon = "⚖️"
+
+    return f'<span class="badge-trend {cls}">{icon} {label}</span>'
+
+
+def render_market_line(
+    label: str,
+    fair_odds: float | None,
+    book_odds: float | None,
+    ev: float | None,
+    kelly: float | None,
+) -> None:
+    """
+    Renders a single horizontal market row (label + fair odds + book odds + EV/Kelly)
+    inside the current Streamlit container.
+    """
+    col_m1, col_m2, col_m3, col_m4 = st.columns([1.4, 0.9, 0.9, 0.9])
+
+    with col_m1:
+        st.markdown(
+            f'<span class="metric-label">{label}</span>',
+            unsafe_allow_html=True,
+        )
+
+    with col_m2:
+        if fair_odds:
+            st.markdown(
+                f'<div class="metric-value">{fair_odds:.2f}</div>'
+                f'<div class="metric-label">Odd Justa</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="metric-label">Odd Justa</div>',
+                unsafe_allow_html=True,
+            )
+
+    with col_m3:
+        if book_odds:
+            st.markdown(
+                f'<div class="metric-value">{book_odds:.2f}</div>'
+                f'<div class="metric-label">Casa</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="metric-label">Casa</div>',
+                unsafe_allow_html=True,
+            )
+
+    with col_m4:
+        if ev is not None and kelly is not None:
+            cls = "ev-positive" if ev >= 0 else "ev-negative"
+            st.markdown(
+                f"""
+                <div class="{cls}">{ev:+.1f}%</div>
+                <div class="metric-label">EV · Kelly {kelly*100:.1f}%</div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="metric-label">EV · Kelly</div>',
+                unsafe_allow_html=True,
+            )
+
+
+def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> None:
+    """
+    This is a skeleton for the match card UI.
+    In the next step we will wire it to the actual main loop and
+    map the correct keys from `result` and `match`.
+    """
+    # Try to read model probabilities. If the actual keys differ,
+    # we will adjust in the next iteration.
+    p_home = float(result.get("p_home_win", 0.0))
+    p_draw = float(result.get("p_draw", 0.0))
+    p_away = float(result.get("p_away_win", 0.0))
+
+    # Basic fair odds from probabilities (we will refine as needed)
+    fair_home = 1.0 / p_home if p_home > 0 else None
+    fair_draw = 1.0 / p_draw if p_draw > 0 else None
+    fair_away = 1.0 / p_away if p_away > 0 else None
+
+    # User-provided odds for 1X2
+    odd_home = odds_ctx.get("home")
+    odd_draw = odds_ctx.get("draw")
+    odd_away = odds_ctx.get("away")
+
+    # Placeholders for EV and Kelly – we will hook in real values
+    # once we confirm the structure of `result`.
+    edge_home = result.get("edge_home")
+    edge_draw = result.get("edge_draw")
+    edge_away = result.get("edge_away")
+
+    kelly_home = result.get("kelly_home")
+    kelly_draw = result.get("kelly_draw")
+    kelly_away = result.get("kelly_away")
+
+    stake_home = bankroll * kelly_home if kelly_home else 0
+    stake_draw = bankroll * kelly_draw if kelly_draw else 0
+    stake_away = bankroll * kelly_away if kelly_away else 0
+
+    trend_badge_html = render_trend_badge(p_home, p_draw, p_away)
+
+    # Start card container
+    st.markdown('<div class="match-card">', unsafe_allow_html=True)
+
+    # Header: teams + league/round + kickoff + trend badge
+    col_h1, col_h2 = st.columns([3, 1.7])
+    with col_h1:
+        # We will assume match has attributes like home_team, away_team,
+        # league_name, round_name, kickoff_str; if not, we will adapt.
+        home_name = getattr(match, "home_team", "Mandante")
+        away_name = getattr(match, "away_team", "Visitante")
+        league_name = getattr(match, "league_name", "")
+        round_name = getattr(match, "round_name", "")
+        kickoff_str = getattr(match, "kickoff_str", "")
+
+        st.markdown(
+            f"""
+            <div class="match-header">
+                <div>
+                    <div class="match-title">
+                        {home_name} vs {away_name}
+                    </div>
+                    <div class="match-subtitle">
+                        {league_name} · {round_name} · {kickoff_str}
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_h2:
+        st.markdown(trend_badge_html, unsafe_allow_html=True)
+
+    # Main 3-column layout: probabilities, 1X2 market, stakes
+    col1, col2, col3 = st.columns([1.5, 2.2, 1.7])
+
+    with col1:
+        st.markdown(
+            '<div class="pill-metric">📊 Probabilidades do modelo</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"""
+            <div class="pill-metric"><strong>Mandante</strong> {p_home*100:.1f}%</div>
+            <div class="pill-metric"><strong>Empate</strong> {p_draw*100:.1f}%</div>
+            <div class="pill-metric"><strong>Visitante</strong> {p_away*100:.1f}%</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        lambda_home = result.get("lambda_home")
+        lambda_away = result.get("lambda_away")
+        if lambda_home is not None and lambda_away is not None:
+            st.markdown(
+                f"""
+                <div class="pill-metric">
+                    ⚽ <strong>xG modelo</strong> {lambda_home:.2f} · {lambda_away:.2f}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with col2:
+        st.markdown(
+            '<div class="metric-label">Mercado 1X2 – Odds, Odd Justa, EV & Kelly</div>',
+            unsafe_allow_html=True,
+        )
+        render_market_line(
+            label="1 (Mandante)",
+            fair_odds=fair_home,
+            book_odds=odd_home,
+            ev=edge_home,
+            kelly=kelly_home,
+        )
+        render_market_line(
+            label="X (Empate)",
+            fair_odds=fair_draw,
+            book_odds=odd_draw,
+            ev=edge_draw,
+            kelly=kelly_draw,
+        )
+        render_market_line(
+            label="2 (Visitante)",
+            fair_odds=fair_away,
+            book_odds=odd_away,
+            ev=edge_away,
+            kelly=kelly_away,
+        )
+
+    with col3:
+        st.markdown(
+            '<div class="metric-label">Stake (Kelly Fractional)</div>',
+            unsafe_allow_html=True,
+        )
+        if stake_home > 0:
+            st.markdown(
+                f'<div class="pill-metric">🏠 1 (Mandante): <strong>R$ {stake_home:.2f}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        if stake_draw > 0:
+            st.markdown(
+                f'<div class="pill-metric">➖ X (Empate): <strong>R$ {stake_draw:.2f}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        if stake_away > 0:
+            st.markdown(
+                f'<div class="pill-metric">✈️ 2 (Visitante): <strong>R$ {stake_away:.2f}</strong></div>',
+                unsafe_allow_html=True,
+            )
+
+    # Detailed analysis: for now just a placeholder, we will hook it
+    # to format_report in a later step.
+    with st.expander("🔍 Análise detalhada & mercados auxiliares"):
+        st.write(
+            "Resumo tático, distribuição de probabilidades e mercados auxiliares "
+            "(this will be wired to format_report in the next step)."
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
 st.sidebar.header("⚙️ Configurações")
 
 available_leagues = LeagueRegistry.get_available_leagues()
