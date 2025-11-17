@@ -22,7 +22,11 @@ def cached_load_premier_round_matches(round_number: int):
 def cached_run_prediction(match, n_sim: int):
     return run_prediction(match, n_sim=n_sim)
 
-st.set_page_config(page_title="Prognósticos de Futebol", layout="wide")
+st.set_page_config(
+    page_title="Prognósticos – Premier League & Brasileirão",
+    page_icon="⚽",
+    layout="wide"
+)
 
 st.sidebar.header("⚙️ Configurações")
 
