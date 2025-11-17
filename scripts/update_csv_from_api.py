@@ -12,12 +12,14 @@ Data: 2025-11-14
 """
 
 import argparse
-import pandas as pd
-from pathlib import Path
-from datetime import datetime
-import sys
-import os
 import logging
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 # Adicionar diretório raiz ao path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,22 +34,49 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+BR_DEFAULTS = {
+    "lambda_home": 1.45,
+    "lambda_away": 1.15,
+    "mean_cards": 4.7,
+    "mean_corners": 9.2,
+}
 
-def update_matches_csv(collector, csv_dir: Path, season: str):
-    """Atualiza CSV de matches"""
-    logger.info("📥 Coletando matches da API...")
+BR_TARGET_COLUMNS = [
+    "round",
+    "home_team",
+    "away_team",
+    "kickoff_utc",
+    "lambda_home",
+    "lambda_away",
+    "mean_cards",
+    "mean_corners",
+    "status",
+    "match_id",
+]
+
+
+def update_matches_csv(collector, csv_dir: Path, season: str, league_key: str) -> bool:
+    """
+    Atualiza CSV de partidas respeitando o formato específico de cada liga.
+    """
+    if league_key == "brasileirao":
+        return update_brasileirao_matches_csv(collector, csv_dir, season)
+    return _update_generic_matches_csv(collector, csv_dir, season)
+
+
+def _update_generic_matches_csv(collector, csv_dir: Path, season: str) -> bool:
+    """Mantém o comportamento anterior para ligas que ainda usam o CSV completo."""
+    logger.info("📥 Coletando matches da API (formato genérico)...")
 
     try:
-        matches = collector.get_matches(status=None)  # Todos os status
+        matches = collector.get_matches(season=int(season), status=None)
 
         if not matches:
             logger.warning("⚠️ Nenhum match retornado da API")
             return False
 
-        # Converter para DataFrame
         df = pd.DataFrame(matches)
 
-        # Garantir colunas esperadas
         expected_cols = [
             'id', 'round', 'date', 'home_team', 'away_team',
             'home_score', 'away_score', 'status', 'referee',
@@ -55,7 +84,6 @@ def update_matches_csv(collector, csv_dir: Path, season: str):
             'home_corners', 'away_corners', 'home_cards', 'away_cards'
         ]
 
-        # Adicionar colunas faltantes com valores padrão
         for col in expected_cols:
             if col not in df.columns:
                 if col in ['home_score', 'away_score', 'home_shots', 'away_shots',
@@ -64,16 +92,14 @@ def update_matches_csv(collector, csv_dir: Path, season: str):
                 elif col in ['home_xg', 'away_xg']:
                     df[col] = None
                 elif col == 'round':
-                    df[col] = 1  # Padrão
+                    df[col] = 1
                 elif col == 'referee':
                     df[col] = ''
                 else:
                     df[col] = ''
 
-        # Reordenar colunas
         df = df[expected_cols]
 
-        # Salvar CSV
         csv_file = csv_dir / f'{season}_matches.csv'
         df.to_csv(csv_file, index=False)
 
@@ -83,6 +109,110 @@ def update_matches_csv(collector, csv_dir: Path, season: str):
     except Exception as e:
         logger.error(f"❌ Erro ao atualizar matches: {e}")
         return False
+
+
+def update_brasileirao_matches_csv(collector, csv_dir: Path, season: str) -> bool:
+    """
+    Atualiza o CSV oficial do Brasileirão no formato consumido pela UI premium.
+
+    Colunas mínimas:
+        round, home_team, away_team, kickoff_utc,
+        lambda_home, lambda_away, mean_cards, mean_corners
+
+    Observação: Este script é a fonte de verdade para alimentar os cards premium
+    do Brasileirão. Execute-o sempre que precisar atualizar data/csv/brasileirao.
+    """
+    logger.info("📥 Coletando matches do Brasileirão no formato padronizado...")
+
+    try:
+        matches = collector.get_matches(season=int(season), status=None)
+    except Exception as exc:
+        logger.error(f"❌ Erro na coleta de partidas do Brasileirão: {exc}")
+        return False
+
+    if not matches:
+        logger.warning("⚠️ Nenhuma partida retornada para o Brasileirão")
+        return False
+
+    rows: List[Dict[str, Any]] = []
+    for match in matches:
+        home = (match.get("home_team") or "").strip()
+        away = (match.get("away_team") or "").strip()
+        round_number = _extract_round(match)
+        kickoff_iso = _ensure_isoformat(match.get("kickoff_utc") or match.get("date"))
+
+        if not home or not away or round_number is None:
+            continue
+
+        rows.append({
+            "round": round_number,
+            "home_team": home,
+            "away_team": away,
+            "kickoff_utc": kickoff_iso,
+            "lambda_home": _safe_float(match.get("lambda_home"), BR_DEFAULTS["lambda_home"]),
+            "lambda_away": _safe_float(match.get("lambda_away"), BR_DEFAULTS["lambda_away"]),
+            "mean_cards": _safe_float(match.get("mean_cards"), BR_DEFAULTS["mean_cards"]),
+            "mean_corners": _safe_float(match.get("mean_corners"), BR_DEFAULTS["mean_corners"]),
+            "status": match.get("status"),
+            "match_id": match.get("id"),
+        })
+
+    if not rows:
+        logger.error("❌ Não foi possível construir linhas para o Brasileirão (dados insuficientes)")
+        return False
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(by=["round", "kickoff_utc"]).reset_index(drop=True)
+
+    # Garantir colunas alvo e preencher ausências
+    for column in BR_TARGET_COLUMNS:
+        if column not in df.columns:
+            df[column] = None
+
+    csv_file = csv_dir / f'{season}_matches.csv'
+    df.to_csv(csv_file, index=False)
+
+    logger.info(f"✅ Brasileirão salvo com {len(df)} partidas em {csv_file}")
+    return True
+
+def _safe_float(value: Any, default: float) -> float:
+    try:
+        if value in ("", None, "N/A"):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ensure_isoformat(value: Any) -> str:
+    if not value:
+        return ""
+    try:
+        ts = pd.to_datetime(value, utc=True, errors="coerce")
+    except Exception:
+        ts = None
+    if ts is None or pd.isna(ts):
+        return str(value)
+    return ts.isoformat()
+
+
+def _extract_round(match: Dict[str, Any]) -> Optional[int]:
+    candidates = [
+        match.get("round"),
+        match.get("matchday"),
+        match.get("stage"),
+    ]
+    for candidate in candidates:
+        if candidate in (None, "", "N/A"):
+            continue
+        try:
+            return int(candidate)
+        except (TypeError, ValueError):
+            # Some APIs return strings like "REGULAR_SEASON - 5"
+            digits = "".join(ch for ch in str(candidate) if ch.isdigit())
+            if digits:
+                return int(digits)
+    return None
 
 
 def update_teams_csv(collector, csv_dir: Path, season: str):
@@ -245,7 +375,7 @@ def update_league_csv(league_key: str, season: str = '2025'):
 
     # Atualizar cada CSV
     results = {
-        'matches': update_matches_csv(collector, csv_dir, season),
+        'matches': update_matches_csv(collector, csv_dir, season, league_key),
         'teams': update_teams_csv(collector, csv_dir, season),
         'standings': update_standings_csv(collector, csv_dir, season)
     }

@@ -1,5 +1,11 @@
-import streamlit as st
 import os
+from datetime import datetime
+from pathlib import Path
+from typing import Literal, Any
+
+import pandas as pd
+import streamlit as st
+
 from ui.league_selector import render_league_selector, get_league_info
 from data.collectors.hybrid_collector import HybridDataCollector
 from utils.leagues_config import get_api_config
@@ -10,7 +16,7 @@ from modules.roi.roi_simulator import ROISimulator
 from leagues.league_registry import LeagueRegistry
 from models.dixon_coles import DixonColesModel
 from analysis.premier_league_data_pipeline import load_premier_round_matches
-from analysis.prediction import run_prediction, format_report
+from analysis.prediction import run_prediction, format_report, MatchInputs
 
 st.set_page_config(
     page_title="Prognósticos – Premier League & Brasileirão",
@@ -30,6 +36,16 @@ THEME = {
     "text_muted": "#9ca3af",
     "accent": "#facc15",
 }
+
+BASE_DIR = Path(__file__).resolve().parent
+BR_DATA_DIR = BASE_DIR / "data" / "csv" / "brasileirao"
+BR_MATCHES_CSV = BR_DATA_DIR / "2025_matches.csv"
+
+# Fallback averages when CSV rows are missing richer context for Brasileirão fixtures.
+DEFAULT_BR_HOME_LAMBDA = 1.45
+DEFAULT_BR_AWAY_LAMBDA = 1.15
+DEFAULT_BR_CARDS = 4.5
+DEFAULT_BR_CORNERS = 9.2
 
 st.markdown(
     f"""
@@ -150,9 +166,46 @@ def cached_load_premier_round_matches(round_number: int):
 def cached_run_prediction(match, n_sim: int):
     return run_prediction(match, n_sim=n_sim)
 
-from typing import Literal
+@st.cache_data(show_spinner="Carregando rodada do Brasileirão...")
+def cached_load_brasileirao_round_matches(round_number: int):
+    return load_brasileirao_round_matches(round_number)
+
+@st.cache_data(show_spinner="Lendo rodadas disponíveis do Brasileirão...")
+def cached_brasileirao_rounds() -> list[int]:
+    if not BR_MATCHES_CSV.exists():
+        return []
+
+    try:
+        df = pd.read_csv(BR_MATCHES_CSV, usecols=["round"])
+    except ValueError:
+        df = pd.read_csv(BR_MATCHES_CSV)
+
+    round_series = pd.to_numeric(df.get("round"), errors="coerce").dropna()
+    rounds = sorted({int(value) for value in round_series.tolist()})
+    return rounds
 
 Trend = Literal["home", "draw", "away"]
+
+
+def normalize_default_odd(value: float | None) -> float:
+    if value is None or value < 1.01:
+        return 1.01
+    return float(value)
+
+
+def compute_ev(prob: float, odd_value: float) -> float | None:
+    if odd_value <= 1:
+        return None
+    return prob * odd_value - 1
+
+
+def compute_kelly_raw(prob: float, odd_value: float) -> float | None:
+    if odd_value <= 1:
+        return None
+    edge_val = prob * odd_value - 1
+    if edge_val <= 0:
+        return None
+    return edge_val / (odd_value - 1)
 
 
 def get_trend(p_home: float, p_draw: float, p_away: float) -> Trend:
@@ -401,6 +454,148 @@ def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> N
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+
+def _to_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        value = cleaned.replace(",", ".")
+    if pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _mean_or_default(values: list[float | None], default: float) -> float:
+    valid = [v for v in values if v is not None]
+    if not valid:
+        return default
+    return sum(valid) / len(valid)
+
+
+def _parse_brasileirao_datetime(label: str):
+    if not label:
+        return None
+    cleaned = str(label).strip()
+    if not cleaned:
+        return None
+    iso_candidate = cleaned.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(iso_candidate)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(cleaned, fmt)
+        except ValueError:
+            continue
+    return cleaned
+
+
+def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
+    """
+    Carrega partidas do Brasileirão a partir de data/csv/brasileirao/2025_matches.csv.
+
+    O CSV é gerado por scripts/update_csv_from_api.py e contém as colunas:
+        round, home_team, away_team, kickoff_utc, lambda_home, lambda_away,
+        mean_cards, mean_corners, além de metadados opcionais.
+
+    Para manter compatibilidade com versões antigas, o loader também aceita
+    colunas legadas (home_xg, home_cards etc).
+    """
+    if not BR_MATCHES_CSV.exists():
+        raise FileNotFoundError(f"Brasileirão matches CSV não encontrado: {BR_MATCHES_CSV}")
+
+    df = pd.read_csv(BR_MATCHES_CSV)
+    df["round"] = pd.to_numeric(df.get("round"), errors="coerce")
+    legacy_round = pd.to_numeric(df.get("round_number"), errors="coerce")
+    if legacy_round.notna().any():
+        df["round"] = df["round"].fillna(legacy_round)
+
+    target_round = int(round_number)
+    round_df = df[df["round"] == target_round]
+
+    match_inputs: list[MatchInputs] = []
+    for _, row in round_df.iterrows():
+        home_team = str(row.get("home_team", "")).strip()
+        away_team = str(row.get("away_team", "")).strip()
+        if not home_team or not away_team:
+            continue
+
+        lambda_home = (
+            _to_float(row.get("lambda_home"))
+            or _to_float(row.get("home_xg"))
+            or DEFAULT_BR_HOME_LAMBDA
+        )
+        lambda_away = (
+            _to_float(row.get("lambda_away"))
+            or _to_float(row.get("away_xg"))
+            or DEFAULT_BR_AWAY_LAMBDA
+        )
+
+        mean_cards = (
+            _to_float(row.get("mean_cards"))
+            or _mean_or_default(
+                [_to_float(row.get("home_cards")), _to_float(row.get("away_cards"))],
+                DEFAULT_BR_CARDS,
+            )
+        )
+        mean_corners = (
+            _to_float(row.get("mean_corners"))
+            or _mean_or_default(
+                [_to_float(row.get("home_corners")), _to_float(row.get("away_corners"))],
+                DEFAULT_BR_CORNERS,
+            )
+        )
+
+        kickoff_source = row.get("kickoff_utc") or row.get("kickoff") or row.get("date")
+        kickoff_dt = _parse_brasileirao_datetime(kickoff_source)
+        kickoff_value = kickoff_dt if isinstance(kickoff_dt, datetime) else kickoff_source
+        if isinstance(kickoff_value, datetime):
+            kickoff_label = kickoff_value.strftime("%d %b %Y %H:%M (UTC)")
+        else:
+            kickoff_label = str(kickoff_value or "")
+
+        context = {
+            "round": target_round,
+            "status": row.get("status", "SCHEDULED"),
+            "league": "Brasileirão Série A",
+            "kickoff_label": kickoff_label,
+            "lambda_cards_home": max(mean_cards * 0.55, 1.0),
+            "lambda_cards_away": max(mean_cards * 0.45, 0.8),
+            "lambda_corners": mean_corners,
+            "odds": row.get("odds") or {},
+            "fixture_metadata": {
+                "match_id": row.get("match_id") or row.get("id"),
+                "raw_stage": row.get("stage"),
+            },
+        }
+
+        match_inputs.append(
+            MatchInputs(
+                home_team=home_team,
+                away_team=away_team,
+                round_number=target_round,
+                kickoff_utc=kickoff_value,
+                lambda_home=lambda_home,
+                lambda_away=lambda_away,
+                mean_cards=mean_cards,
+                mean_corners=mean_corners,
+                context=context,
+                raw_row=row.to_dict(),
+            )
+        )
+
+    if not match_inputs:
+        raise ValueError(f"Nenhuma partida do Brasileirão encontrada para a rodada {round_number}")
+
+    return match_inputs
+
 st.sidebar.header("⚙️ Configurações")
 
 available_leagues = LeagueRegistry.get_available_leagues()
@@ -410,6 +605,14 @@ selected_league_key = st.sidebar.selectbox(
     format_func=lambda x: available_leagues[x]
 )
 selected_round = st.sidebar.selectbox("Rodada:", list(range(1, 39)))
+available_rounds_br = cached_brasileirao_rounds()
+if not available_rounds_br:
+    available_rounds_br = list(range(1, 39))
+selected_round_br = st.sidebar.selectbox(
+    "Rodada Brasileirão:",
+    options=available_rounds_br,
+    index=0,
+)
 n_sim = st.sidebar.slider("Simulações (n_sim)", 5000, 100000, 50000, step=5000)
 st.sidebar.subheader("💰 Gestão de Banca")
 bankroll = st.sidebar.number_input(
@@ -571,11 +774,6 @@ if selected_league == 'premier_league':
     ev_values_for_avg: list[float] = []
 
     if matches:
-        def normalize_default(value: float | None) -> float:
-            if value is None or value < 1.01:
-                return 1.01
-            return float(value)
-
         cols = st.columns(2)
         for idx, match in enumerate(matches):
             if idx != 0 and idx % 2 == 0:
@@ -585,9 +783,9 @@ if selected_league == 'premier_league':
             context = match.context or {}
             odds_defaults = context.get("odds") or {}
 
-            default_home = normalize_default(odds_defaults.get("home"))
-            default_draw = normalize_default(odds_defaults.get("draw"))
-            default_away = normalize_default(odds_defaults.get("away"))
+            default_home = normalize_default_odd(odds_defaults.get("home"))
+            default_draw = normalize_default_odd(odds_defaults.get("draw"))
+            default_away = normalize_default_odd(odds_defaults.get("away"))
 
             with col:
                 odds_col1, odds_col2, odds_col3 = st.columns(3)
@@ -630,19 +828,6 @@ if selected_league == 'premier_league':
                     p_home = result["p_home_win"]
                     p_draw = result["p_draw"]
                     p_away = result["p_away_win"]
-
-                    def compute_ev(prob: float, odd_value: float) -> float | None:
-                        if odd_value <= 1:
-                            return None
-                        return prob * odd_value - 1
-
-                    def compute_kelly_raw(prob: float, odd_value: float) -> float | None:
-                        if odd_value <= 1:
-                            return None
-                        edge_val = prob * odd_value - 1
-                        if edge_val <= 0:
-                            return None
-                        return edge_val / (odd_value - 1)
 
                     ev_home = compute_ev(p_home, odd_home)
                     ev_draw = compute_ev(p_draw, odd_draw)
@@ -720,6 +905,158 @@ if selected_league == 'premier_league':
         st.metric("EV médio (seleções positivas)", f"{avg_ev:.1f}%")
 
     st.markdown("---")
+
+st.markdown("## 🇧🇷 Brasileirão – Prognósticos")
+
+try:
+    brasileirao_matches = cached_load_brasileirao_round_matches(selected_round_br)
+except Exception as brasileirao_error:
+    st.error(f"❌ Erro ao carregar rodada do Brasileirão: {brasileirao_error}")
+    brasileirao_matches = []
+
+total_matches_br = 0
+total_value_bets_br = 0
+total_stake_suggested_br = 0.0
+ev_values_for_avg_br: list[float] = []
+
+if brasileirao_matches:
+    cols_br = st.columns(2)
+    for idx, match in enumerate(brasileirao_matches):
+        if idx != 0 and idx % 2 == 0:
+            cols_br = st.columns(2)
+
+        col = cols_br[idx % 2]
+        context = getattr(match, "context", {}) or {}
+        odds_defaults = context.get("odds") or {}
+
+        default_home = normalize_default_odd(odds_defaults.get("home"))
+        default_draw = normalize_default_odd(odds_defaults.get("draw"))
+        default_away = normalize_default_odd(odds_defaults.get("away"))
+
+        with col:
+            odds_col1, odds_col2, odds_col3 = st.columns(3)
+
+            with odds_col1:
+                odd_home = st.number_input(
+                    f"Odd Mandante – BR-{idx+1}",
+                    value=default_home,
+                    min_value=1.01,
+                    step=0.01,
+                    key=f"br_odd_home_{selected_round_br}_{idx}",
+                )
+
+            with odds_col2:
+                odd_draw = st.number_input(
+                    f"Odd Empate – BR-{idx+1}",
+                    value=default_draw,
+                    min_value=1.01,
+                    step=0.01,
+                    key=f"br_odd_draw_{selected_round_br}_{idx}",
+                )
+
+            with odds_col3:
+                odd_away = st.number_input(
+                    f"Odd Visitante – BR-{idx+1}",
+                    value=default_away,
+                    min_value=1.01,
+                    step=0.01,
+                    key=f"br_odd_away_{selected_round_br}_{idx}",
+                )
+
+            odds_ctx = {"home": odd_home, "draw": odd_draw, "away": odd_away}
+
+            try:
+                result = cached_run_prediction(match, n_sim=n_sim)
+                result["n_sim"] = n_sim
+                p_home = result["p_home_win"]
+                p_draw = result["p_draw"]
+                p_away = result["p_away_win"]
+
+                ev_home = compute_ev(p_home, odd_home)
+                ev_draw = compute_ev(p_draw, odd_draw)
+                ev_away = compute_ev(p_away, odd_away)
+
+                kelly_home_raw = compute_kelly_raw(p_home, odd_home)
+                kelly_draw_raw = compute_kelly_raw(p_draw, odd_draw)
+                kelly_away_raw = compute_kelly_raw(p_away, odd_away)
+
+                kelly_home = kelly_home_raw * kelly_fraction if kelly_home_raw is not None else None
+                kelly_draw = kelly_draw_raw * kelly_fraction if kelly_draw_raw is not None else None
+                kelly_away = kelly_away_raw * kelly_fraction if kelly_away_raw is not None else None
+
+                result["edge_home"] = ev_home * 100 if ev_home is not None else None
+                result["edge_draw"] = ev_draw * 100 if ev_draw is not None else None
+                result["edge_away"] = ev_away * 100 if ev_away is not None else None
+
+                result["kelly_home"] = kelly_home
+                result["kelly_draw"] = kelly_draw
+                result["kelly_away"] = kelly_away
+
+                result["lambda_home"] = getattr(match, "lambda_home", None)
+                result["lambda_away"] = getattr(match, "lambda_away", None)
+
+                league_name = "Brasileirão Série A"
+                round_label = f"Rodada {selected_round_br}"
+                kickoff_value = getattr(match, "kickoff_utc", None)
+                if hasattr(kickoff_value, "strftime"):
+                    kickoff_label = kickoff_value.strftime("%d %b %Y %H:%M")
+                elif kickoff_value:
+                    kickoff_label = str(kickoff_value)
+                else:
+                    kickoff_label = context.get("kickoff_label", "")
+
+                setattr(match, "league_name", league_name)
+                setattr(match, "round_name", round_label)
+                setattr(match, "kickoff_str", kickoff_label)
+
+                total_matches_br += 1
+                for ev_percent, kelly_val in [
+                    (result.get("edge_home"), result.get("kelly_home")),
+                    (result.get("edge_draw"), result.get("kelly_draw")),
+                    (result.get("edge_away"), result.get("kelly_away")),
+                ]:
+                    if (
+                        ev_percent is not None
+                        and kelly_val is not None
+                        and ev_percent > 0
+                        and kelly_val > 0
+                    ):
+                        total_value_bets_br += 1
+                        stake = bankroll * kelly_val
+                        total_stake_suggested_br += stake
+                        ev_values_for_avg_br.append(ev_percent)
+
+                render_match_card(match, result, odds_ctx, bankroll)
+            except Exception as prediction_error:
+                st.warning(
+                    f"⚠️ Não foi possível gerar o prognóstico para esta partida do Brasileirão: {prediction_error}"
+                )
+else:
+    st.info("Nenhum jogo disponível para a rodada selecionada do Brasileirão.")
+
+st.markdown('<div class="section-title">🎯 Resumo do dia – Brasileirão</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-sub">Visão geral das partidas do Brasileirão analisadas, quantidade de value bets e distribuição de stakes.</div>',
+    unsafe_allow_html=True,
+)
+
+avg_ev_br = (
+    sum(ev_values_for_avg_br) / len(ev_values_for_avg_br)
+    if ev_values_for_avg_br
+    else 0.0
+)
+
+col_br_a, col_br_b, col_br_c, col_br_d = st.columns(4)
+with col_br_a:
+    st.metric("Jogos analisados", total_matches_br)
+with col_br_b:
+    st.metric("Value bets 1X2", total_value_bets_br)
+with col_br_c:
+    st.metric("Stake total sugerida", f"R$ {total_stake_suggested_br:.2f}")
+with col_br_d:
+    st.metric("EV médio (seleções positivas)", f"{avg_ev_br:.1f}%")
+
+st.markdown("---")
 
 st.sidebar.header("⚙️ Configurações")
 
