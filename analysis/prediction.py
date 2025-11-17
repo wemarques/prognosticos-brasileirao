@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -16,8 +16,8 @@ class MatchInputs:
     lambda_away: float
     mean_cards: float
     mean_corners: float
-    context: Dict[str, Any] | None = None
-    raw_row: Dict[str, Any] | None = None
+    context: Optional[Dict[str, Any]] = None
+    raw_row: Optional[Dict[str, Any]] = None
 
 
 def run_prediction(match_inputs: MatchInputs) -> Dict[str, Any]:
