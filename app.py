@@ -291,6 +291,8 @@ def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> N
         league_name = getattr(match, "league_name", "")
         round_name = getattr(match, "round_name", "")
         kickoff_str = getattr(match, "kickoff_str", "")
+        n_simulations = result.get("n_sim")
+        sims_label = f" · {n_simulations:,} sims" if n_simulations else ""
 
         st.markdown(
             f"""
@@ -300,7 +302,7 @@ def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> N
                         {home_name} vs {away_name}
                     </div>
                     <div class="match-subtitle">
-                        {league_name} · {round_name} · {kickoff_str}
+                        {league_name} · {round_name} · {kickoff_str}{sims_label}
                     </div>
                 </div>
             </div>
@@ -388,13 +390,14 @@ def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> N
                 unsafe_allow_html=True,
             )
 
-    # Detailed analysis: for now just a placeholder, we will hook it
-    # to format_report in a later step.
     with st.expander("🔍 Análise detalhada & mercados auxiliares"):
-        st.write(
-            "Resumo tático, distribuição de probabilidades e mercados auxiliares "
-            "(this will be wired to format_report in the next step)."
-        )
+        try:
+            report_text = format_report(match, result)
+            st.markdown(f"```\n{report_text}\n```")
+        except Exception:
+            st.write(
+                "Não foi possível gerar o relatório detalhado para esta partida."
+            )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -408,6 +411,22 @@ selected_league_key = st.sidebar.selectbox(
 )
 selected_round = st.sidebar.selectbox("Rodada:", list(range(1, 39)))
 n_sim = st.sidebar.slider("Simulações (n_sim)", 5000, 100000, 50000, step=5000)
+st.sidebar.subheader("💰 Gestão de Banca")
+bankroll = st.sidebar.number_input(
+    "Banca (R$)",
+    min_value=10.0,
+    value=100.0,
+    step=10.0,
+    help="Valor de referência para cálculo de stake via Kelly Fractional.",
+)
+kelly_fraction = st.sidebar.slider(
+    "Fração de Kelly",
+    min_value=0.1,
+    max_value=0.5,
+    value=0.25,
+    step=0.05,
+    help="Fração do Kelly Criterion a usar (0.25 = Quarter Kelly, conservador)"
+)
 
 try:
     model = DixonColesModel(selected_league_key)
@@ -547,32 +566,59 @@ if selected_league == 'premier_league':
         matches = []
 
     if matches:
+        def normalize_default(value: float | None) -> float:
+            if value is None or value < 1.01:
+                return 1.01
+            return float(value)
+
+        cols = st.columns(2)
         for idx, match in enumerate(matches):
-            label = f"{match.home_team} vs {match.away_team}"
-            with st.expander(f"⚽ {label} (n_sim={n_sim:,})", expanded=(idx == 0)):
-                context = match.context or {}
-                odds = context.get("odds") or {}
-                metadata = context.get("fixture_metadata") or {}
+            if idx != 0 and idx % 2 == 0:
+                cols = st.columns(2)
 
-                st.write(f"**Kickoff (UTC):** {match.kickoff_utc}")
+            col = cols[idx % 2]
+            context = match.context or {}
+            odds_defaults = context.get("odds") or {}
 
-                venue = context.get("venue")
-                if venue:
-                    st.write(f"**Estádio:** {venue}")
+            default_home = normalize_default(odds_defaults.get("home"))
+            default_draw = normalize_default(odds_defaults.get("draw"))
+            default_away = normalize_default(odds_defaults.get("away"))
 
-                if metadata:
-                    status = metadata.get("status") or context.get("status")
-                    if status:
-                        st.write(f"**Status:** {status}")
-                    if metadata.get("stage"):
-                        st.write(f"**Fase:** {metadata['stage']}")
+            with col:
+                odds_col1, odds_col2, odds_col3 = st.columns(3)
 
-                if any(odds.values()):
-                    odds_display = ", ".join(
-                        f"{key}: {value}" for key, value in odds.items() if value
+                with odds_col1:
+                    odd_home = st.number_input(
+                        f"Odd Mandante – {idx+1}",
+                        value=default_home,
+                        min_value=1.01,
+                        step=0.01,
+                        key=f"odd_home_{selected_round}_{idx}"
                     )
-                    if odds_display:
-                        st.write(f"**Odds:** {odds_display}")
+
+                with odds_col2:
+                    odd_draw = st.number_input(
+                        f"Odd Empate – {idx+1}",
+                        value=default_draw,
+                        min_value=1.01,
+                        step=0.01,
+                        key=f"odd_draw_{selected_round}_{idx}"
+                    )
+
+                with odds_col3:
+                    odd_away = st.number_input(
+                        f"Odd Visitante – {idx+1}",
+                        value=default_away,
+                        min_value=1.01,
+                        step=0.01,
+                        key=f"odd_away_{selected_round}_{idx}"
+                    )
+
+                odds_ctx = {
+                    "home": odd_home,
+                    "draw": odd_draw,
+                    "away": odd_away,
+                }
 
                 try:
                     result = cached_run_prediction(match, n_sim=n_sim)
@@ -580,88 +626,52 @@ if selected_league == 'premier_league':
                     p_draw = result["p_draw"]
                     p_away = result["p_away_win"]
 
-                    odds_defaults = context.get("odds") or {}
+                    def compute_ev(prob: float, odd_value: float) -> float | None:
+                        if odd_value <= 1:
+                            return None
+                        return prob * odd_value - 1
 
-                    def normalize_default(value: float | None) -> float:
-                        if value is None or value < 1.01:
-                            return 1.01
-                        return float(value)
+                    def compute_kelly_fraction(prob: float, odd_value: float) -> float:
+                        if odd_value <= 1:
+                            return 0.0
+                        edge_val = prob * odd_value - 1
+                        if edge_val <= 0:
+                            return 0.0
+                        base_fraction = edge_val / (odd_value - 1)
+                        return max(base_fraction * kelly_fraction, 0.0)
 
-                    default_home = normalize_default(odds_defaults.get("home"))
-                    default_draw = normalize_default(odds_defaults.get("draw"))
-                    default_away = normalize_default(odds_defaults.get("away"))
+                    ev_home = compute_ev(p_home, odd_home)
+                    ev_draw = compute_ev(p_draw, odd_draw)
+                    ev_away = compute_ev(p_away, odd_away)
 
-                    col1, col2, col3 = st.columns(3)
+                    kelly_home_fraction = compute_kelly_fraction(p_home, odd_home)
+                    kelly_draw_fraction = compute_kelly_fraction(p_draw, odd_draw)
+                    kelly_away_fraction = compute_kelly_fraction(p_away, odd_away)
 
-                    with col1:
-                        odd_home = st.number_input(
-                            "Odd Mandante",
-                            value=default_home,
-                            min_value=1.01,
-                            step=0.01,
-                            key=f"odd_home_{selected_round}_{idx}"
-                        )
-                        ev_home = p_home * odd_home - 1
-                        if ev_home > 0:
-                            st.success(f"EV: {ev_home:+.2f}")
-                        else:
-                            st.warning(f"EV: {ev_home:+.2f}")
-                        stake_home = 0.0
-                        if ev_home > 0 and odd_home > 1:
-                            stake_home = max(bankroll * (ev_home / (odd_home - 1)) * kelly_fraction, 0.0)
-                        st.caption(f"Stake sugerida: R$ {stake_home:.2f}")
+                    result["edge_home"] = ev_home * 100 if ev_home is not None else None
+                    result["edge_draw"] = ev_draw * 100 if ev_draw is not None else None
+                    result["edge_away"] = ev_away * 100 if ev_away is not None else None
 
-                    with col2:
-                        odd_draw = st.number_input(
-                            "Odd Empate",
-                            value=default_draw,
-                            min_value=1.01,
-                            step=0.01,
-                            key=f"odd_draw_{selected_round}_{idx}"
-                        )
-                        ev_draw = p_draw * odd_draw - 1
-                        if ev_draw > 0:
-                            st.success(f"EV: {ev_draw:+.2f}")
-                        else:
-                            st.warning(f"EV: {ev_draw:+.2f}")
-                        stake_draw = 0.0
-                        if ev_draw > 0 and odd_draw > 1:
-                            stake_draw = max(bankroll * (ev_draw / (odd_draw - 1)) * kelly_fraction, 0.0)
-                        st.caption(f"Stake sugerida: R$ {stake_draw:.2f}")
+                    result["kelly_home"] = kelly_home_fraction
+                    result["kelly_draw"] = kelly_draw_fraction
+                    result["kelly_away"] = kelly_away_fraction
 
-                    with col3:
-                        odd_away = st.number_input(
-                            "Odd Visitante",
-                            value=default_away,
-                            min_value=1.01,
-                            step=0.01,
-                            key=f"odd_away_{selected_round}_{idx}"
-                        )
-                        ev_away = p_away * odd_away - 1
-                        if ev_away > 0:
-                            st.success(f"EV: {ev_away:+.2f}")
-                        else:
-                            st.warning(f"EV: {ev_away:+.2f}")
-                        stake_away = 0.0
-                        if ev_away > 0 and odd_away > 1:
-                            stake_away = max(bankroll * (ev_away / (odd_away - 1)) * kelly_fraction, 0.0)
-                        st.caption(f"Stake sugerida: R$ {stake_away:.2f}")
+                    result["lambda_home"] = getattr(match, "lambda_home", None)
+                    result["lambda_away"] = getattr(match, "lambda_away", None)
 
-                    fair_home = 1 / p_home if p_home > 0 else None
-                    fair_draw = 1 / p_draw if p_draw > 0 else None
-                    fair_away = 1 / p_away if p_away > 0 else None
+                    league_name = league_info.get("name", "Premier League")
+                    round_label = f"Rodada {selected_round}"
+                    kickoff_value = getattr(match, "kickoff_utc", "")
+                    if hasattr(kickoff_value, "strftime"):
+                        kickoff_label = kickoff_value.strftime("%d %b %Y %H:%M UTC")
+                    else:
+                        kickoff_label = str(kickoff_value) if kickoff_value else ""
 
-                    st.markdown("**Odds Justas**")
-                    fair_col1, fair_col2, fair_col3 = st.columns(3)
-                    with fair_col1:
-                        st.metric("Mandante", f"{fair_home:.2f}" if fair_home else "—")
-                    with fair_col2:
-                        st.metric("Empate", f"{fair_draw:.2f}" if fair_draw else "—")
-                    with fair_col3:
-                        st.metric("Visitante", f"{fair_away:.2f}" if fair_away else "—")
+                    setattr(match, "league_name", league_name)
+                    setattr(match, "round_name", round_label)
+                    setattr(match, "kickoff_str", kickoff_label)
 
-                    report = format_report(match, result)
-                    st.text(report)
+                    render_match_card(match, result, odds_ctx, bankroll)
                 except Exception as prediction_error:
                     st.warning(f"⚠️ Não foi possível gerar o prognóstico: {prediction_error}")
     else:
@@ -686,24 +696,6 @@ with st.sidebar.expander("📊 Fonte de Dados", expanded=False):
         st.info("🎲 Odds: The Odds API")
     else:
         st.warning("⚠️ Odds API não configurada")
-
-st.sidebar.subheader("💰 Gestão de Banca")
-bankroll = st.sidebar.number_input(
-    "Valor da Banca (R$)",
-    min_value=100.0,
-    max_value=100000.0,
-    value=1000.0,
-    step=100.0,
-    help="Valor total disponível para apostas"
-)
-kelly_fraction = st.sidebar.slider(
-    "Fração de Kelly",
-    min_value=0.1,
-    max_value=0.5,
-    value=0.25,
-    step=0.05,
-    help="Fração do Kelly Criterion a usar (0.25 = Quarter Kelly, conservador)"
-)
 
 st.sidebar.markdown("---")
 
