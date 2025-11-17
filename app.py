@@ -9,6 +9,8 @@ from modules.roi.kelly_criterion import KellyCriterion
 from modules.roi.roi_simulator import ROISimulator
 from leagues.league_registry import LeagueRegistry
 from models.dixon_coles import DixonColesModel
+from analysis.premier_league_data_pipeline import load_premier_round_matches
+from analysis.prediction import run_prediction, format_report
 
 st.set_page_config(page_title="Prognósticos de Futebol", layout="wide")
 
@@ -20,6 +22,7 @@ selected_league_key = st.sidebar.selectbox(
     options=list(available_leagues.keys()),
     format_func=lambda x: available_leagues[x]
 )
+selected_round = st.sidebar.selectbox("Rodada:", list(range(1, 39)))
 
 try:
     model = DixonColesModel(selected_league_key)
@@ -150,6 +153,53 @@ if selected_league == 'brasileirao':
 else:
     fixtures_collector = None
 
+if selected_league == 'premier_league':
+    st.subheader(f"Premier League – Rodada {selected_round}")
+    try:
+        matches = load_premier_round_matches(selected_round)
+    except Exception as pipeline_error:
+        st.error(f"❌ Erro ao carregar rodada: {pipeline_error}")
+        matches = []
+
+    if matches:
+        for idx, match in enumerate(matches):
+            label = f"{match.home_team} vs {match.away_team}"
+            with st.expander(f"⚽ {label}", expanded=(idx == 0)):
+                context = match.context or {}
+                odds = context.get("odds") or {}
+                metadata = context.get("fixture_metadata") or {}
+
+                st.write(f"**Kickoff (UTC):** {match.kickoff_utc}")
+
+                venue = context.get("venue")
+                if venue:
+                    st.write(f"**Estádio:** {venue}")
+
+                if metadata:
+                    status = metadata.get("status") or context.get("status")
+                    if status:
+                        st.write(f"**Status:** {status}")
+                    if metadata.get("stage"):
+                        st.write(f"**Fase:** {metadata['stage']}")
+
+                if any(odds.values()):
+                    odds_display = ", ".join(
+                        f"{key}: {value}" for key, value in odds.items() if value
+                    )
+                    if odds_display:
+                        st.write(f"**Odds:** {odds_display}")
+
+                try:
+                    result = run_prediction(match)
+                    report = format_report(match, result)
+                    st.text(report)
+                except Exception as prediction_error:
+                    st.warning(f"⚠️ Não foi possível gerar o prognóstico: {prediction_error}")
+    else:
+        st.info("Nenhum jogo disponível para essa rodada.")
+
+    st.markdown("---")
+
 st.sidebar.header("⚙️ Configurações")
 
 # Informações sobre fonte de dados
@@ -189,14 +239,17 @@ kelly_fraction = st.sidebar.slider(
 st.sidebar.markdown("---")
 
 # Seletor de rodada
-rodada = st.sidebar.number_input(
-    "Número da Rodada",
-    min_value=1,
-    max_value=38,
-    value=1,
-    step=1,
-    help="Selecione a rodada para análise"
-)
+if selected_league_key == 'premier_league':
+    rodada = selected_round
+else:
+    rodada = st.sidebar.number_input(
+        "Número da Rodada",
+        min_value=1,
+        max_value=38,
+        value=1,
+        step=1,
+        help="Selecione a rodada para análise"
+    )
 
 # Seletor de modo
 modo = st.sidebar.radio(
