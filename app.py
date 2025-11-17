@@ -12,6 +12,16 @@ from models.dixon_coles import DixonColesModel
 from analysis.premier_league_data_pipeline import load_premier_round_matches
 from analysis.prediction import run_prediction, format_report
 
+
+@st.cache_data(show_spinner="Carregando rodada da Premier League...")
+def cached_load_premier_round_matches(round_number: int):
+    return load_premier_round_matches(round_number)
+
+
+@st.cache_data(show_spinner="Executando simulações de partida...")
+def cached_run_prediction(match, n_sim: int):
+    return run_prediction(match, n_sim=n_sim)
+
 st.set_page_config(page_title="Prognósticos de Futebol", layout="wide")
 
 st.sidebar.header("⚙️ Configurações")
@@ -23,6 +33,7 @@ selected_league_key = st.sidebar.selectbox(
     format_func=lambda x: available_leagues[x]
 )
 selected_round = st.sidebar.selectbox("Rodada:", list(range(1, 39)))
+n_sim = st.sidebar.slider("Simulações (n_sim)", 5000, 100000, 50000, step=5000)
 
 try:
     model = DixonColesModel(selected_league_key)
@@ -156,7 +167,7 @@ else:
 if selected_league == 'premier_league':
     st.subheader(f"Premier League – Rodada {selected_round}")
     try:
-        matches = load_premier_round_matches(selected_round)
+        matches = cached_load_premier_round_matches(selected_round)
     except Exception as pipeline_error:
         st.error(f"❌ Erro ao carregar rodada: {pipeline_error}")
         matches = []
@@ -164,7 +175,7 @@ if selected_league == 'premier_league':
     if matches:
         for idx, match in enumerate(matches):
             label = f"{match.home_team} vs {match.away_team}"
-            with st.expander(f"⚽ {label}", expanded=(idx == 0)):
+            with st.expander(f"⚽ {label} (n_sim={n_sim:,})", expanded=(idx == 0)):
                 context = match.context or {}
                 odds = context.get("odds") or {}
                 metadata = context.get("fixture_metadata") or {}
@@ -190,7 +201,7 @@ if selected_league == 'premier_league':
                         st.write(f"**Odds:** {odds_display}")
 
                 try:
-                    result = run_prediction(match)
+                    result = cached_run_prediction(match, n_sim=n_sim)
                     report = format_report(match, result)
                     st.text(report)
                 except Exception as prediction_error:
