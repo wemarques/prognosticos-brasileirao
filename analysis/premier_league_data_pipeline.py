@@ -58,6 +58,27 @@ def load_premier_round_matches(round_id: int) -> List[MatchInputs]:
         home_stats = _build_team_stats(team_index.get(_normalize_team_name(home_team)), is_home=True)
         away_stats = _build_team_stats(team_index.get(_normalize_team_name(away_team)), is_home=False)
         context = _build_context(row)
+        context["home_stats"] = home_stats
+        context["away_stats"] = away_stats
+
+        pre_match_home_xg = _optional_float(row.get("Home Team Pre-Match xG"))
+        pre_match_away_xg = _optional_float(row.get("Away Team Pre-Match xG"))
+
+        lambda_home = _estimate_lambda(
+            attack=home_stats.get("xg_for_home"),
+            opponent_defense=away_stats.get("xgc_against_away"),
+            pre_match_xg=pre_match_home_xg,
+            default=DEFAULT_HOME_XG,
+        )
+        lambda_away = _estimate_lambda(
+            attack=away_stats.get("xg_for_away"),
+            opponent_defense=home_stats.get("xgc_against_home"),
+            pre_match_xg=pre_match_away_xg,
+            default=DEFAULT_AWAY_XG,
+        )
+
+        mean_cards = (context["lambda_cards_home"] + context["lambda_cards_away"]) / 2.0
+        mean_corners = context["lambda_corners"]
 
         match_inputs.append(
             MatchInputs(
@@ -65,10 +86,12 @@ def load_premier_round_matches(round_id: int) -> List[MatchInputs]:
                 away_team=away_team,
                 round_number=round_id,
                 kickoff_utc=_parse_timestamp(row.get("timestamp"), row.get("date_GMT")),
-                home_stats=home_stats,
-                away_stats=away_stats,
+                lambda_home=lambda_home,
+                lambda_away=lambda_away,
+                mean_cards=mean_cards,
+                mean_corners=mean_corners,
                 context=context,
-                raw_match=row,
+                raw_row=row,
             )
         )
 
@@ -252,3 +275,30 @@ def _safe_float(value: Any, default: float) -> float:
         return float(value)
     except (ValueError, TypeError):
         return default
+
+
+def _optional_float(value: Any) -> Optional[float]:
+    try:
+        if value in (None, "", "N/A"):
+            return None
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _estimate_lambda(
+    attack: Optional[float],
+    opponent_defense: Optional[float],
+    pre_match_xg: Optional[float],
+    default: float,
+) -> float:
+    """
+    Blend team-specific attack metrics with opponent defensive data and, when available,
+    the CSV pre-match xG baseline. Keeps values within realistic Poisson bounds.
+    """
+    base = attack if attack is not None else default
+    if opponent_defense is not None:
+        base = (base * 0.65) + (opponent_defense * 0.35)
+    if pre_match_xg is not None:
+        base = (base * 0.7) + (pre_match_xg * 0.3)
+    return max(0.2, base)
