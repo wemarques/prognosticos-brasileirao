@@ -19,10 +19,10 @@ class PremierLeague(BaseLeague):
         Based on 2023-2024 season data.
         """
         return {
-            'hfa': 1.42,  # Home field advantage
-            'ava': 0.88,  # Away venue adjustment
-            'league_avg_goals': 1.58,  # Average goals per game
-            'rho': -0.08  # Correlation between home and away goals
+            'hfa': 1.42,
+            'ava': 0.88,
+            'league_avg_goals': 1.58,
+            'rho': -0.08
         }
 
     def get_fallback_stats(self) -> dict:
@@ -55,9 +55,9 @@ class PremierLeague(BaseLeague):
         Get league ID for different API providers.
         """
         ids = {
-            'football-data': 'PL',  # Premier League code in Football-Data
-            'footystats': '2106',     # ID in FootyStats
-            'odds-api': 'soccer_epl'  # The Odds API
+            'football-data': 'PL',
+            'footystats': '2106',
+            'odds-api': 'soccer_epl'
         }
         return ids.get(provider, '')
 
@@ -65,4 +65,4 @@ class PremierLeague(BaseLeague):
         return 20
 
     def get_num_rounds(self) -> int:
-        return 38  # 20 teams, double round-robin (home and away)
+        return 38
