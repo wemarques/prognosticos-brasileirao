@@ -1123,7 +1123,7 @@ if modo == "🎯 Jogo Específico (Time vs Time)":
         teams_list = get_teams_list(league_id=2013)
     else:
         teams = collector.get_teams()
-        teams_list = [team['name'] for team in teams] if teams else []
+        teams_list = [team for team in teams] if teams else []
     
     col1, col2 = st.columns(2)
     
@@ -1266,6 +1266,6 @@ st.subheader("Times")
 teams = collector.get_teams()
 if teams:
     for team in teams[:5]:
-        st.write(f"- {team['name']}")
+        st.write(f"- {team}")
 else:
     st.warning("Nenhum time encontrado")
