@@ -1263,6 +1263,24 @@ else:
     st.warning("Nenhum jogo encontrado")
 
 st.subheader("Times")
+    teams = collector.get_teams()
+    if teams:
+        for team in teams[:5]:
+            # Extrair nome do time independente da estrutura
+            if isinstance(team, dict):
+                # Tentar diferentes chaves
+                team_name = (
+                    team.get("name") or
+                    team.get("team_name") or
+                    team.get("common_name") or
+                    str(team)
+                )
+                st.write(f"- {team_name}")
+            else:
+                # Se for string direta
+                st.write(f"- {team}")
+    else:
+        st.warning("Nenhum time encontrado")
 teams = collector.get_teams()
 if teams:
     for team in teams[:5]:
