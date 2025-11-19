@@ -86,15 +86,67 @@ class HybridDataCollector:
         try:
             df = pd.read_csv(matches_file)
 
+            # Normalizar nomes de colunas para formato padronizado
+            # Premier League usa nomes diferentes
+            column_mapping = {}
+            if 'home_team_name' in df.columns:
+                column_mapping['home_team_name'] = 'home_team'
+            if 'away_team_name' in df.columns:
+                column_mapping['away_team_name'] = 'away_team'
+            if 'Game Week' in df.columns:
+                column_mapping['Game Week'] = 'round'
+            if 'date_GMT' in df.columns:
+                # Renomear date_GMT para date
+                if 'date' not in df.columns:
+                    column_mapping['date_GMT'] = 'date'
+            
+            if column_mapping:
+                df = df.rename(columns=column_mapping)
+            
+            # Criar kickoff_utc se não existir (usar date ou date_GMT)
+            if 'kickoff_utc' not in df.columns:
+                if 'date' in df.columns:
+                    df['kickoff_utc'] = df['date']
+                elif 'date_GMT' in df.columns:
+                    df['kickoff_utc'] = df['date_GMT']
+            
+            # Garantir que temos 'date' se não existir
+            if 'date' not in df.columns:
+                if 'kickoff_utc' in df.columns:
+                    df['date'] = df['kickoff_utc']
+                elif 'date_GMT' in df.columns:
+                    df['date'] = df['date_GMT']
+            
+            # Normalizar status (Premier League usa "complete" ao invés de "FINISHED")
+            if 'status' in df.columns:
+                df['status'] = df['status'].replace({
+                    'complete': 'FINISHED',
+                    'scheduled': 'SCHEDULED',
+                    'in_play': 'IN_PLAY',
+                    'live': 'IN_PLAY'
+                })
+
             # Filtros
             if round_number is not None:
-                df = df[df['round'] == round_number]
+                round_col = 'round' if 'round' in df.columns else 'Game Week'
+                if round_col in df.columns:
+                    df = df[df[round_col] == round_number]
 
             if status:
-                df = df[df['status'] == status]
+                if 'status' in df.columns:
+                    # Normalizar status do filtro também
+                    if status == 'FINISHED':
+                        df = df[df['status'].isin(['FINISHED', 'complete'])]
+                    elif status == 'SCHEDULED':
+                        df = df[df['status'].isin(['SCHEDULED', 'scheduled'])]
+                    else:
+                        df = df[df['status'] == status]
 
             if team:
-                df = df[(df['home_team'] == team) | (df['away_team'] == team)]
+                home_col = 'home_team' if 'home_team' in df.columns else 'home_team_name'
+                away_col = 'away_team' if 'away_team' in df.columns else 'away_team_name'
+                if home_col in df.columns and away_col in df.columns:
+                    df = df[(df[home_col] == team) | (df[away_col] == team)]
 
             # Converter para lista de dicionários
             matches = df.to_dict('records')

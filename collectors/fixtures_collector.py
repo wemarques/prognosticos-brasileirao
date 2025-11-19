@@ -1,17 +1,16 @@
 """
-Fixtures Collector - Busca jogos programados de cada rodada
+Fixtures Collector - Busca jogos programados de cada rodada a partir de CSV
 """
-import os
-import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from utils.logger import setup_logger
+from data.collectors.hybrid_collector import HybridDataCollector
 
 logger = setup_logger(__name__)
 
 
 class FixturesCollector:
     """
-    Collect and cache fixtures (scheduled matches) for a league.
+    Collect fixtures (scheduled matches) for a league from CSV files.
     """
     
     def __init__(self, league_id=2013):
@@ -22,19 +21,22 @@ class FixturesCollector:
             league_id: Football-Data.org league ID (2013 = Brasileirão Série A)
         """
         self.league_id = league_id
-        self.league_name = "Brasileirão Série A"
-        self.api_key = os.getenv('FOOTBALL_DATA_API_KEY')
-        self.base_url = "https://api.football-data.org/v4"
+        # Mapear league_id para league_key
+        league_key_map = {
+            2013: 'brasileirao',
+            2021: 'premier_league',
+        }
+        self.league_key = league_key_map.get(league_id, 'brasileirao')
+        self.league_name = "Brasileirão Série A" if league_id == 2013 else "Premier League"
         
-        self._cache = {}
-        self._cache_timestamp = {}
-        self._cache_duration = timedelta(hours=6)
+        # Usar HybridDataCollector para buscar dados do CSV
+        self.collector = HybridDataCollector(league_key=self.league_key)
         
-        logger.info(f"📅 Fixtures Collector initialized for {self.league_name}")
+        logger.info(f"📅 Fixtures Collector initialized for {self.league_name} (usando CSV)")
     
     def get_fixtures_by_round(self, round_number):
         """
-        Get all fixtures for a specific round.
+        Get all fixtures for a specific round from CSV.
         
         Args:
             round_number (int): Round number (1-38)
@@ -42,49 +44,31 @@ class FixturesCollector:
         Returns:
             list: List of fixtures with home/away teams
         """
-        if self._is_cache_valid(round_number):
-            logger.info(f"📦 Using cached fixtures for round {round_number}")
-            return self._cache[round_number]
-        
-        logger.info(f"🌐 Fetching fixtures for round {round_number} from API")
+        logger.info(f"📂 Buscando fixtures da rodada {round_number} do CSV")
         
         try:
-            headers = {
-                'X-Auth-Token': self.api_key
-            }
+            # Buscar matches do CSV
+            matches = self.collector.get_matches(round_number=round_number)
             
-            url = f"{self.base_url}/competitions/{self.league_id}/matches"
-            params = {
-                'matchday': round_number
-            }
-            
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            
-            data = response.json()
             fixtures = []
-            
-            for match in data.get('matches', []):
+            for match in matches:
                 fixture = {
-                    'home_team': match['homeTeam']['name'],
-                    'home_team_id': match['homeTeam']['id'],
-                    'away_team': match['awayTeam']['name'],
-                    'away_team_id': match['awayTeam']['id'],
+                    'home_team': match.get('home_team', ''),
+                    'home_team_id': match.get('home_team_id'),
+                    'away_team': match.get('away_team', ''),
+                    'away_team_id': match.get('away_team_id'),
                     'round': round_number,
-                    'date': match.get('utcDate', ''),
-                    'status': match.get('status', '')
+                    'date': match.get('date') or match.get('kickoff_utc', ''),
+                    'status': match.get('status', 'SCHEDULED')
                 }
                 fixtures.append(fixture)
             
-            self._cache[round_number] = fixtures
-            self._cache_timestamp[round_number] = datetime.now()
-            
-            logger.info(f"✅ Found {len(fixtures)} fixtures for round {round_number}")
+            logger.info(f"✅ Encontrados {len(fixtures)} fixtures para a rodada {round_number}")
             
             return fixtures
             
         except Exception as e:
-            logger.error(f"❌ Error fetching fixtures: {e}")
+            logger.error(f"❌ Erro ao buscar fixtures do CSV: {e}")
             return []
     
     def find_opponent(self, team_name, round_number, is_home=None):
@@ -130,20 +114,3 @@ class FixturesCollector:
         logger.warning(f"⚠️ No opponent found for {team_name} in round {round_number}")
         return None
     
-    def _is_cache_valid(self, round_number):
-        """Check if cache is still valid for a round"""
-        if round_number not in self._cache:
-            return False
-        
-        timestamp = self._cache_timestamp.get(round_number)
-        if not timestamp:
-            return False
-        
-        age = datetime.now() - timestamp
-        return age < self._cache_duration
-    
-    def clear_cache(self):
-        """Clear all cached fixtures"""
-        self._cache = {}
-        self._cache_timestamp = {}
-        logger.info("🗑️ Cache cleared")

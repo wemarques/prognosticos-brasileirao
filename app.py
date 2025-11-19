@@ -1069,7 +1069,11 @@ with st.sidebar.expander("📊 Fonte de Dados", expanded=False):
         if info['exists']:
             st.success(f"✅ {file_type.title()}: {info['rows']} registros")
         else:
-            st.error(f"❌ {file_type.title()}: Não encontrado")
+            # Standings é opcional, outros arquivos são mais importantes
+            if file_type == 'standings':
+                st.warning(f"⚠️ {file_type.title()}: Não encontrado (opcional)")
+            else:
+                st.error(f"❌ {file_type.title()}: Não encontrado")
 
     if odds_api_key:
         st.info("🎲 Odds: The Odds API")
