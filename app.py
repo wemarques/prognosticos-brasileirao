@@ -513,8 +513,8 @@ def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
 
     df = pd.read_csv(BR_MATCHES_CSV)
     df["round"] = pd.to_numeric(df.get("round"), errors="coerce")
-    legacy_round = pd.to_numeric(df.get("round_number"), errors="coerce")
-    if legacy_round.notna().any():
+    if "round_number" in df.columns:
+        legacy_round = pd.to_numeric(df["round_number"], errors="coerce")
         df["round"] = df["round"].fillna(legacy_round)
 
     target_round = int(round_number)
