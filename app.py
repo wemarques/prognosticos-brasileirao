@@ -1281,9 +1281,3 @@ if teams:
             st.write(f"- {team}")
 else:
     st.warning("Nenhum time encontrado")
-teams = collector.get_teams()
-if teams:
-    for team in teams[:5]:
-        st.write(f"- {team}")
-else:
-    st.warning("Nenhum time encontrado")
