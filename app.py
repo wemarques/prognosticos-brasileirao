@@ -39,7 +39,17 @@ THEME = {
 
 BASE_DIR = Path(__file__).resolve().parent
 BR_DATA_DIR = BASE_DIR / "data" / "csv" / "brasileirao"
-BR_MATCHES_CSV = BR_DATA_DIR / "2025_matches.csv"
+def _br_csv_for_season(season: int) -> Path:
+    return BR_DATA_DIR / f"{season}_matches.csv"
+def _list_brasileirao_seasons() -> list[int]:
+    out: list[int] = []
+    for p in BR_DATA_DIR.glob("*_matches.csv"):
+        try:
+            year = int(p.name.split("_")[0])
+            out.append(year)
+        except Exception:
+            continue
+    return sorted(set(out)) or [2025]
 
 # Fallback averages when CSV rows are missing richer context for Brasileirão fixtures.
 DEFAULT_BR_HOME_LAMBDA = 1.45
@@ -167,18 +177,19 @@ def cached_run_prediction(match, n_sim: int):
     return run_prediction(match, n_sim=n_sim)
 
 @st.cache_data(show_spinner="Carregando rodada do Brasileirão...")
-def cached_load_brasileirao_round_matches(round_number: int):
-    return load_brasileirao_round_matches(round_number)
+def cached_load_brasileirao_round_matches(round_number: int, season: int):
+    return load_brasileirao_round_matches(round_number, season)
 
 @st.cache_data(show_spinner="Lendo rodadas disponíveis do Brasileirão...")
-def cached_brasileirao_rounds() -> list[int]:
-    if not BR_MATCHES_CSV.exists():
+def cached_brasileirao_rounds(season: int) -> list[int]:
+    csv_path = _br_csv_for_season(season)
+    if not csv_path.exists():
         return []
 
     try:
-        df = pd.read_csv(BR_MATCHES_CSV, usecols=["round"])
+        df = pd.read_csv(csv_path, usecols=["round"])
     except ValueError:
-        df = pd.read_csv(BR_MATCHES_CSV)
+        df = pd.read_csv(csv_path)
 
     round_series = pd.to_numeric(df.get("round"), errors="coerce").dropna()
     rounds = sorted({int(value) for value in round_series.tolist()})
@@ -443,6 +454,33 @@ def render_match_card(match, result: dict, odds_ctx: dict, bankroll: float) -> N
                 unsafe_allow_html=True,
             )
 
+    st.markdown('<div class="section-title">⚽ Mercado de Gols & BTTS</div>', unsafe_allow_html=True)
+    col_g1, col_g2 = st.columns([1.2, 1.2])
+    def _prob(key_list: list[str]) -> float | None:
+        for k in key_list:
+            v = result.get(k)
+            if isinstance(v, (int, float)) and v >= 0 and v <= 1:
+                return float(v)
+            if isinstance(v, (int, float)) and v > 1 and v <= 100:
+                return float(v) / 100.0
+        return None
+    with col_g1:
+        st.markdown('<div class="metric-label">Over Goals</div>', unsafe_allow_html=True)
+        for label, keys in [
+            ("Over 1.5", ["p_over_15"]),
+            ("Over 2.5", ["p_over_25"]),
+            ("Over 3.5", ["p_over_35"]),
+            ("Over 4.5", ["p_over_45"]),
+        ]:
+            p = _prob(keys)
+            fair = (1.0 / p) if p and p > 0 else None
+            render_market_line(label=label, fair_odds=fair, book_odds=None, ev=None, kelly=None)
+    with col_g2:
+        st.markdown('<div class="metric-label">BTTS</div>', unsafe_allow_html=True)
+        p_btts = _prob(["p_btts", "p_both_teams_score", "p_btts_yes"])
+        fair_btts = (1.0 / p_btts) if p_btts and p_btts > 0 else None
+        render_market_line(label="BTTS (Sim)", fair_odds=fair_btts, book_odds=None, ev=None, kelly=None)
+
     with st.expander("🔍 Análise detalhada & mercados auxiliares"):
         try:
             report_text = format_report(match, result)
@@ -497,7 +535,7 @@ def _parse_brasileirao_datetime(label: str):
     return cleaned
 
 
-def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
+def load_brasileirao_round_matches(round_number: int, season: int) -> list[MatchInputs]:
     """
     Carrega partidas do Brasileirão a partir de data/csv/brasileirao/2025_matches.csv.
 
@@ -508,10 +546,11 @@ def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
     Para manter compatibilidade com versões antigas, o loader também aceita
     colunas legadas (home_xg, home_cards etc).
     """
-    if not BR_MATCHES_CSV.exists():
-        raise FileNotFoundError(f"Brasileirão matches CSV não encontrado: {BR_MATCHES_CSV}")
+    csv_path = _br_csv_for_season(season)
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Brasileirão matches CSV não encontrado: {csv_path}")
 
-    df = pd.read_csv(BR_MATCHES_CSV)
+    df = pd.read_csv(csv_path)
     df["round"] = pd.to_numeric(df.get("round"), errors="coerce")
     if "round_number" in df.columns:
         legacy_round = pd.to_numeric(df["round_number"], errors="coerce")
@@ -574,6 +613,7 @@ def load_brasileirao_round_matches(round_number: int) -> list[MatchInputs]:
                 "match_id": row.get("match_id") or row.get("id"),
                 "raw_stage": row.get("stage"),
             },
+            "season": season,
         }
 
         match_inputs.append(
@@ -605,7 +645,9 @@ selected_league_key = st.sidebar.selectbox(
     format_func=lambda x: available_leagues[x]
 )
 selected_round = st.sidebar.selectbox("Rodada:", list(range(1, 39)))
-available_rounds_br = cached_brasileirao_rounds()
+br_seasons = _list_brasileirao_seasons()
+selected_br_season = st.sidebar.selectbox("Ano (Brasileirão):", options=br_seasons, index=len(br_seasons)-1)
+available_rounds_br = cached_brasileirao_rounds(selected_br_season)
 if not available_rounds_br:
     available_rounds_br = list(range(1, 39))
 selected_round_br = st.sidebar.selectbox(
@@ -909,7 +951,7 @@ if selected_league == 'premier_league':
 st.markdown("## 🇧🇷 Brasileirão – Prognósticos")
 
 try:
-    brasileirao_matches = cached_load_brasileirao_round_matches(selected_round_br)
+    brasileirao_matches = cached_load_brasileirao_round_matches(selected_round_br, selected_br_season)
 except Exception as brasileirao_error:
     st.error(f"❌ Erro ao carregar rodada do Brasileirão: {brasileirao_error}")
     brasileirao_matches = []
@@ -1008,6 +1050,7 @@ if brasileirao_matches:
                 setattr(match, "league_name", league_name)
                 setattr(match, "round_name", round_label)
                 setattr(match, "kickoff_str", kickoff_label)
+                setattr(match, "season", selected_br_season)
 
                 total_matches_br += 1
                 for ev_percent, kelly_val in [
